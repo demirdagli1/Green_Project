@@ -5,9 +5,9 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
 ## 🚀 Proje Durumu ve Özet
 
 - **Statik Kod Analizi:** `dart analyze` ile 0 hata, 0 uyarı
-- **Test Kapsamı:** **71 / 71 test başarılı** (`rules_test`, `store_test`, `ui_flow_test`, `gm_panel_test`)
-- **Derleme Modu:** Tamamen çevrimdışı (offline Gradle, JDK 17, AGP, `--no-daemon --max-workers=1`)
-- **Fiziksel Cihaz Doğrulaması:** Samsung SM-A346E (Android 16 / API 36) üzerinde kurulum, canlı telemetri/sensör dinleyicileri, izin akışı ve yerel PC GM Paneli USB loopback testi doğrulandı.
+- **Test Kapsamı:** **94 / 94 test başarılı** (`rules_test`, `store_test`, `ui_flow_test`, `gm_panel_test`, `leaderboard_window_test`, `phase_b_c_test`)
+- **Derleme Modu:** Tamamen çevrimdışı (offline Gradle, JDK 17, AGP, `--no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m"`)
+- **Fiziksel Cihaz Uyumluluğu:** Samsung SM-A346E (Android 16 / API 36)
 - **Ekran Uyum Testi:** 320x568 küçük ekran + %160 metin boyutu altında taşmasız dinamik yerleşim.
 
 ---
@@ -15,8 +15,8 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
 ## 📱 Temel Modüller ve Özellikler
 
 1. **Onboarding & İzin Akışı:**
-   - İlk açılışta toplu izin talebi (`welcome_screen.dart`), tekrar eden sistem uyarıları olmaksızın hızlı başlangıç.
-   - Ana sayfada kalabalık yaratan teknik sensör kartı kaldırılmış, Profil sayfasının altına taşınmıştır.
+   - İlk açılışta tek izin-deneme akışı (`welcome_screen.dart`), ana sayfadan teknik sensör kartı kaldırılmıştır.
+   - Profil sayfası altında jüri/admin ve donanım telemetrisi seçenekleri korunmaktadır.
 
 2. **Aktivite Takibi ve Sensör Telemetrisi:**
    - Adım sayacı ve 1000 adımda bir +5 puan mekanizması.
@@ -25,20 +25,24 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
    - Ham telemetri takibi (donanım sayacı, baseline, varyans, GPS fix/doğruluk).
 
 3. **Toplu Taşıma (QR & NFC):**
-   - Tek biniş için +3 puan ve sabit CO₂ tasarrufu.
-   - 45 dakikalık durak bazlı ortak cooldown kuralı (aynı durakta mükerrer biniş engeli).
-   - Manuel payload girişi ve simülasyon desteği.
+   - Alt gezinme çubuğunda bağımsız sekme (`[0] QR/NFC`).
+   - Tek biniş için +3 puan ve sabit CO₂ tasarrufu; 45 dakikalık durak bazlı ortak cooldown kuralı.
 
-4. **Bisiklet ve Araç/Taksi Denetimi:**
-   - Bisiklet sürüşlerinde mesafe bazlı puanlama ve >25 km/sa hızda ivmeölçer varyans eşiği (`0.12`). Net ceza ve ret açıklamaları.
-   - Araç/taksi kullanımında (>30 km/sa) son 45 dk transit binişi yoksa harcanan CO₂ hesabı ve Utanç Tablosu kaydı; deterministik test seçeneği.
+4. **Liderlik Tablosu & Gezinme (Aşama B):**
+   - Yatay lig buton/filtre şeridi kaldırılmıştır.
+   - Satır düzeni: `#RANK | AVATAR | İSİM (altında klan) | LİG LOGOSU BADGE | PUAN`.
+   - Sabit sol Gurur/Utanç seçicisi ve sağ zaman (Haftalık/Tüm Zamanlar) kontrolü.
+   - Klan sıralamaları tamamen hibrit formül ile hesaplanır: `0.6 * toplam + 0.4 * 50 * üye_ortalaması` (<5 üye sıralama dışı).
+   - Pencereleme (Top 10 + kendi satırı ± 1 komşu) ve 120 satırlık test fixture ile doğrulanmış `LeaderboardWindow`.
+   - 4 öğeli alt menü: `QR/NFC | Ana Menü (varsayılan) | Sıralamalar | Profil`. Floating FAB kaldırılmıştır.
 
-5. **Liderlik ve Utanç Tablosu:**
-   - **Gurur Tablosu:** Bireysel ve klan bazlı haftalık/tüm zamanlar sıralamaları, hibrit normalize klan puanı hesabı (`0.6 × ToplamPuan + 0.4 × 50 × ÜyeOrtalaması`).
-   - **Utanç Tablosu:** Harcanan CO₂ miktarına göre sıralama ve isim maskeleme (`Pel***`; yalnızca görsel gizleme sağlar, hukuki uyumluluk garantisi değildir).
-
-6. **Kozmetik Mağazası & Envanter:**
-   - Puanların altına dönüştürülmesiyle avatar, çerçeve ve evcil hayvan satın alma ve kuşanma.
+5. **Ana Sayfa & Profil (Aşama C):**
+   - Henüz kesinleşmemiş haftalık şampiyonlar için açık `[DEMO]` etiketi fallback desteği.
+   - Birleşik klan ve bireysel lig kartları: Tıklanınca sıralama sekmesine geçiş ve kendi satırını vurgulama.
+   - Maskeli Utanç Tablosu özeti (`Pel***`) ve tam tabloya doğrudan geçiş.
+   - Paket indirmeden Android Photo Picker / OpenDocument native köprüsü ile profil fotoğrafı seçme/kaldırma ve yeniden başlatma kalıcılığı.
+   - Max 160 karakter biyografi düzenleyici (Türkçe ve emoji güvenli). Normal profilde cihaz UUID gizlenmiştir.
+   - İnsan tarafından okunabilir kozmetik isimleri ve asset slot fallback desteği.
 
 ---
 
@@ -57,26 +61,27 @@ Harici web hosting gerektirmeyen, Android cihaz içinde yerel loopback (`127.0.0
    http://127.0.0.1:8088/?token=<GM_TOKEN>
    ```
 
-3. **Güvenlik Mimarisi:**
-   - Release modunda otomatik olarak devre dışı bırakılır (`kReleaseMode`).
-   - 401 yanıtlarında token bilgisi ifşa edilmez.
-   - Sıkı Origin kontrolü (`localhost` / `127.0.0.1:8088`), phishing domain koruması.
-   - 64 KB streaming gövde sınırlaması.
-   - Komutlarda idempotent duplicate önleme ve çakışma (conflict) tespiti.
-   - Katı sayısal sınır kontrolleri (adım, streak, altın).
+3. **Güvenlik Mimarisi & Sözleşme:**
+   - Release modunda otomatik devre dışı (`kReleaseMode`).
+   - Origin kontrolü (`localhost` / `127.0.0.1:8088`), 64 KB streaming sınırı, idempotent duplicate ve conflict koruması.
+   - Profil alanları (`bio`, `photoPath`) durum JSON'unda sunulur; `set_bio` komutu mevcuttur.
 
 ---
 
 ## 📦 Derleme ve Test
 
 ```bash
-# Testleri çalıştırma:
-flutter test --concurrency=1
+# Testleri çalıştırma (offline, tek worker):
+export FLUTTER_NO_VERSION_CHECK=true CI=true
+flutter test --no-pub --concurrency=1
 
-# Offline APK derleme:
+# Statik analiz:
+dart analyze
+
+# Offline APK derleme (2GB Heap, tek worker):
 cd android
-./gradlew assembleDebug --offline --no-daemon --max-workers=1
+./gradlew assembleDebug --offline --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m"
 
-# Cihaza yükleme:
+# Cihaza veri koruyarak yükleme:
 adb install -r build/app/outputs/flutter-apk/app-debug.apk
 ```

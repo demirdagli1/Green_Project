@@ -2,6 +2,8 @@
 
 Bu dosya DEVAM_RAPORU.md içindeki 22:20 anlık görüntüsünün önüne geçer. Önce bu dosyayı, sonra REVIZYON_02.md ve SON_TESLIM_TALIMATI.md dosyalarını oku. Önceki işleri tekrar başlatma.
 
+**22:39 güncellemesi:** Önceki B/C AGY oturumu az önce tamamlandı; final çıktısı 94/94 test, temiz analiz ve 13s offline build bildiriyor (`agy-revision-bc.log`). Aşağıdaki 91/3 ara sonucu artık eski sonuçtur; eski hataları varmış gibi tekrar düzeltme. Aynı conversation üzerinden final kapsamı D dahil devam ettiren yeni oturum PID48115, unified exec60505, log `agy-final-revision.log`. Önce mevcut test/kanıtları incele; telefon hâlâ çıkarılmış durumda. b3e6610 ara commitindeki kaynakları geri alma.
+
 ## Kesin kullanıcı kuralları
 - Codex yönetir/inceleme ve Git yapar; ürün ve test kodunu yalnız AGY yazar. Model Gemini 3.8 Flash High; Argon/Claude başlatma.
 - Kullanıcı çalışmayı sürdürmemizi, Gemini'ye mevcut kapsamı olabildiğince tamamlatarak sonunda test/derleme ve APK teslimini istedi. Yapay teslim süresi yok. Henüz durdurma isteği yok.
