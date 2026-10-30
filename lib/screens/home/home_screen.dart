@@ -183,17 +183,41 @@ class HomeScreen extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.all(18),
         decoration: _card(24),
-        child: Row(children: [
-          const Icon(Icons.eco, color: Color(0xFF059669), size: 28),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text('Önlenen CO₂ Salımı: ${kg.toStringAsFixed(1)} kg',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF065F46))),
-          ),
-          Text('🌲 ≈$trees Ağaç\n(demo eşdeğer)',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF166534))),
-        ]),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isNarrow = constraints.maxWidth < 280;
+            if (isNarrow) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.eco, color: Color(0xFF059669), size: 28),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text('Önlenen CO₂ Salımı: ${kg.toStringAsFixed(1)} kg',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF065F46))),
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text('🌲 ≈$trees Ağaç (demo eşdeğer)',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Color(0xFF166534))),
+                ],
+              );
+            }
+            return Row(children: [
+              const Icon(Icons.eco, color: Color(0xFF059669), size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text('Önlenen CO₂ Salımı: ${kg.toStringAsFixed(1)} kg',
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF065F46))),
+              ),
+              const SizedBox(width: 8),
+              Text('🌲 ≈$trees Ağaç\n(demo eşdeğer)',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF166534))),
+            ]);
+          },
+        ),
       );
 
   static BoxDecoration _card(double r) => BoxDecoration(

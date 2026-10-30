@@ -121,7 +121,7 @@ void main() {
     expect(find.text('Bu cihazda NFC donanımı yok.'), findsOneWidget);
   });
 
-    testWidgets('küçük ekran + büyük yazı + uzun klan adı taşma üretmez', (t) async {
+  testWidgets('küçük ekran + büyük yazı + uzun klan adı taşma üretmez', (t) async {
     final store = await boot(t, size: const Size(320, 568), textScale: 1.6);
     await t.enterText(find.byType(TextField), 'Ayşe');
     final dropFinder = find.byType(DropdownButtonFormField<String>);
@@ -134,12 +134,7 @@ void main() {
     await t.tap(find.text('Klanıma Katıl ve Başla'));
     await t.pumpAndSettle();
     expect(store.hasProfile, true);
-    final err1 = t.takeException();
-    if (err1 is FlutterError) {
-      print('DEBUG ERR1 FULL:
-' + err1.toStringDeep());
-    }
-    expect(err1, isNull);
+    expect(t.takeException(), isNull);
     await t.tap(find.byTooltip('Sıralama'));
     await t.pumpAndSettle();
     await t.tap(find.text('Klan'));

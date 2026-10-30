@@ -1,6 +1,7 @@
 # Yeşil Adım — görev sözleşmesi
 
 ## Yetki ve sorumluluk
+- Güncel zaman/model sınırı (30 Ekim 2026 20:50 Europe/Istanbul): kullanıcının 35 dakika ifadesi TESLİM SÜRESİ DEĞİL, limit yenilenmesine kalan süredir. Flash High kullanılabilir. Argon limit yenilenmesinin son 15 dakikasında, yani yaklaşık 21:10 sonrasında gerekirse kullanılabilir; daha önce başlatma. Teslim için yapay süre sınırı yok; eksik doğrulamayla işi kapatma. Claude kotası tükendi. Token tasarrufu için geçmişi tekrar tarama ve aynı testi sonuç değişmeden yineleme.
 - Kullanıcı: Codex yalnızca yönetir, kod yazmaz. Uygulama, test ve yapılandırma kodunu AGY alt ajanı yazar. İlk model gemini-3.8-flash-low; yönetici kalite gerekçesiyle medium veya Claude'a yükseltebilir. Hermes/Deepseek bu aşamada kullanılmaz.
 - Asıl kapsam: codex_flutter_android_yonergesi.md ve Şablon.png. Kullanıcının son talimatları üstündür. Önce işlev ve yerleşim; görsel cilalama sonra. Gereksiz animasyon/illüstrasyon üretme.
 - Yalnızca Green_Project içinde değişiklik yap. Diğer projeleri SDK/önbellek/yapılandırma keşfi için salt okunur incele; kaynaklarını, kimlik bilgilerini veya kullanıcı verilerini kopyalama. Sistem ayarlarını değiştirme, cihazı sıfırlama, başka uygulama kaldırma.

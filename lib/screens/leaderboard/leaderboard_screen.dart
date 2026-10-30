@@ -60,26 +60,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               ),
             ),
             _tiers(),
-            if (_clanMode && !_shame)
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Wrap(alignment: WrapAlignment.end, spacing: 6, children: [
-                  ChoiceChip(label: const Text('Toplam Puan', style: TextStyle(fontSize: 11)), selected: !_hybrid, onSelected: (_) => setState(() => _hybrid = false)),
-                  ChoiceChip(label: const Text('Hibrit Normalize', style: TextStyle(fontSize: 11)), selected: _hybrid, onSelected: (_) => setState(() => _hybrid = true)),
-                ]),
-              ),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text('Rakip/klan satırları DEMO verisidir; yalnızca "Sen" gerçek yerel veridir.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-              ),
-            ),
             Expanded(child: _shame ? _shameList(store) : (_clanMode ? _clanList(store) : _userList(store))),
             Container(
               color: Colors.white,
-              padding: const EdgeInsets.all(12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: SafeArea(
                 top: false,
                 child: SizedBox(
@@ -102,7 +86,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   Widget _tiers() => SizedBox(
-        height: 64,
+        height: 56,
         child: ListView(
           scrollDirection: Axis.horizontal,
           padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -111,20 +95,23 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               GestureDetector(
                 onTap: () => setState(() => _tier = i),
                 child: Container(
-                  margin: const EdgeInsets.all(6),
+                  margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                   padding: const EdgeInsets.symmetric(horizontal: 10),
                   decoration: BoxDecoration(
                     color: LeagueTier.allTiers[i].color.withValues(alpha: _tier == i ? 0.25 : 0.08),
                     border: Border.all(color: _tier == i ? LeagueTier.allTiers[i].color : Colors.transparent, width: 2),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: Row(children: [
-                    Text(LeagueTier.allTiers[i].symbol,
-                        style: TextStyle(fontWeight: FontWeight.w900, color: LeagueTier.allTiers[i].color)),
-                    const SizedBox(width: 6),
-                    Text(_clanMode ? LeagueTier.allTiers[i].clanName : LeagueTier.allTiers[i].individualName,
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                  ]),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(LeagueTier.allTiers[i].symbol,
+                          style: TextStyle(fontWeight: FontWeight.w900, color: LeagueTier.allTiers[i].color)),
+                      const SizedBox(width: 6),
+                      Text(_clanMode ? LeagueTier.allTiers[i].clanName : LeagueTier.allTiers[i].individualName,
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
                 ),
               ),
           ],
@@ -161,71 +148,145 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
   Widget _userList(store) {
     final users = store.rankedUsers(allTime: _allTime);
-    if (users.isEmpty) return const Center(child: Text('Henüz kayıt yok.'));
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      for (var i = 0; i < users.length; i++)
-        _row(
-          rank: i + 1,
-          me: users[i].id == store.me?.id,
-          lead: CircleAvatar(
-            radius: 18,
-            child: Text(users[i].username.trim().isEmpty ? '?' : users[i].username.trim().substring(0, 1)),
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Rakip/klan satırları DEMO verisidir; yalnızca "Sen" gerçek yerel veridir.',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
           ),
-          title: '${users[i].username}${users[i].isDemo ? ' (demo)' : ' (Sen)'}',
-          sub: '${users[i].clanName} • ${LeagueTier.fromPoints(users[i].weeklyPoints, category: LeagueCategory.individual).individualName}',
-          trail: '🍃 ${_allTime ? users[i].allTimePoints : users[i].weeklyPoints} P',
         ),
-    ]);
+        if (users.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('Henüz kayıt yok.')),
+          )
+        else
+          for (var i = 0; i < users.length; i++)
+            _row(
+              rank: i + 1,
+              me: users[i].id == store.me?.id,
+              lead: CircleAvatar(
+                radius: 18,
+                child: Text(users[i].username.trim().isEmpty ? '?' : users[i].username.trim().substring(0, 1)),
+              ),
+              title: '${users[i].username}${users[i].isDemo ? ' (demo)' : ' (Sen)'}',
+              sub: '${users[i].clanName} • ${LeagueTier.fromPoints(users[i].weeklyPoints, category: LeagueCategory.individual).individualName}',
+              trail: '🍃 ${_allTime ? users[i].allTimePoints : users[i].weeklyPoints} P',
+            ),
+      ],
+    );
   }
 
   Widget _clanList(store) {
     final eligible = store.rankedClans(hybrid: _hybrid, allTime: _allTime);
     final out = store.clans.where((c) => !c.isEligibleForRanking).toList();
-    if (eligible.isEmpty && out.isEmpty) return const Center(child: Text('Klan yok.'));
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      for (var i = 0; i < eligible.length; i++)
-        _row(
-          rank: i + 1,
-          me: eligible[i].id == store.me?.clanId,
-          lead: Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: LeagueTier.fromPoints(eligible[i].weeklyPoints, category: LeagueCategory.clan).color,
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(Icons.shield, color: Colors.white, size: 18),
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (!_shame)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Wrap(alignment: WrapAlignment.end, spacing: 6, children: [
+              ChoiceChip(
+                label: const Text('Toplam Puan', style: TextStyle(fontSize: 11)),
+                selected: !_hybrid,
+                onSelected: (_) => setState(() => _hybrid = false),
+              ),
+              ChoiceChip(
+                label: const Text('Hibrit Normalize', style: TextStyle(fontSize: 11)),
+                selected: _hybrid,
+                onSelected: (_) => setState(() => _hybrid = true),
+              ),
+            ]),
           ),
-          title: eligible[i].name,
-          sub: '${eligible[i].memberCount} üye • ${LeagueTier.fromPoints(eligible[i].weeklyPoints, category: LeagueCategory.clan).clanName}',
-          trail: _hybrid
-              ? '${eligible[i].hybridScore.toStringAsFixed(0)} H'
-              : '${_allTime ? eligible[i].allTimePoints : eligible[i].weeklyPoints} P',
-        ),
-      if (out.isNotEmpty) ...[
         const Padding(
-          padding: EdgeInsets.symmetric(vertical: 8),
-          child: Text('Yetersiz üye (5\'ten az): sıralamaya alınmadı', style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+          padding: EdgeInsets.only(bottom: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Rakip/klan satırları DEMO verisidir; yalnızca "Sen" gerçek yerel veridir.',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ),
         ),
-        for (final c in out) Text('• ${c.name} (${c.memberCount} üye)', style: const TextStyle(color: AppColors.textMuted)),
+        if (eligible.isEmpty && out.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('Klan yok.')),
+          )
+        else ...[
+          for (var i = 0; i < eligible.length; i++)
+            _row(
+              rank: i + 1,
+              me: eligible[i].id == store.me?.clanId,
+              lead: Container(
+                width: 36,
+                height: 36,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: LeagueTier.fromPoints(eligible[i].weeklyPoints, category: LeagueCategory.clan).color,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.shield, color: Colors.white, size: 18),
+              ),
+              title: eligible[i].name,
+              sub: '${eligible[i].memberCount} üye • ${LeagueTier.fromPoints(eligible[i].weeklyPoints, category: LeagueCategory.clan).clanName}',
+              trail: _hybrid
+                  ? '${eligible[i].hybridScore.toStringAsFixed(0)} H'
+                  : '${_allTime ? eligible[i].allTimePoints : eligible[i].weeklyPoints} P',
+            ),
+          if (out.isNotEmpty) ...[
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text('Yetersiz üye (5\'ten az): sıralamaya alınmadı',
+                  style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+            ),
+            for (final c in out)
+              Text('• ${c.name} (${c.memberCount} üye)',
+                  style: const TextStyle(color: AppColors.textMuted)),
+          ],
+        ],
       ],
-    ]);
+    );
   }
 
   Widget _shameList(store) {
     final list = store.shameBoard();
-    if (list.isEmpty) return const Center(child: Text('Bu hafta kimse utanç tablosunda değil. 🎉'));
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      for (var i = 0; i < list.length; i++)
-        _row(
-          rank: i + 1,
-          bg: const Color(0xFFFEF2F2),
-          lead: const CircleAvatar(radius: 18, backgroundColor: Color(0xFFFCA5A5), child: Text('🚕')),
-          title: NameMasker.maskShameName(list[i].username),
-          sub: '${list[i].weeklyCarTaxiTrips} araba/taksi yolculuğu',
-          trail: '${list[i].weeklyWastedCo2Kg.toStringAsFixed(1)} kg CO₂',
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Rakip satırları DEMO verisidir; yalnızca "Sen" gerçek yerel veridir.',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ),
         ),
-    ]);
+        if (list.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('Bu hafta kimse utanç tablosunda değil. 🎉')),
+          )
+        else
+          for (var i = 0; i < list.length; i++)
+            _row(
+              rank: i + 1,
+              bg: const Color(0xFFFEF2F2),
+              lead: const CircleAvatar(radius: 18, backgroundColor: Color(0xFFFCA5A5), child: Text('🚕')),
+              title: NameMasker.maskShameName(list[i].username),
+              sub: '${list[i].weeklyCarTaxiTrips} araba/taksi yolculuğu',
+              trail: '${list[i].weeklyWastedCo2Kg.toStringAsFixed(1)} kg CO₂',
+            ),
+      ],
+    );
   }
 }
