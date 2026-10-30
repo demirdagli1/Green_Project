@@ -38,7 +38,7 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
 
     private val methodName = "com.yesiladim.ecoclan/hardware"
     private val eventName = "com.yesiladim.ecoclan/events"
-    private val notifChannelId = "yesil_adim_bildirim"
+    private val notifChannelId = "yesil_adim_bildirim_v2"
     private val permRequestCode = 4711
 
     private var sink: EventChannel.EventSink? = null
@@ -254,12 +254,14 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (Build.VERSION.SDK_INT >= 26) {
             nm.createNotificationChannel(
-                NotificationChannel(notifChannelId, "Yeşil Adım", NotificationManager.IMPORTANCE_DEFAULT))
+                NotificationChannel(notifChannelId, "Yeşil Adım Bildirimleri", NotificationManager.IMPORTANCE_HIGH))
         }
         val n = NotificationCompat.Builder(this, notifChannelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title).setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setDefaults(NotificationCompat.DEFAULT_ALL)
             .setAutoCancel(true).build()
         nm.notify(id, n)
         return true

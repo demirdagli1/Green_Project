@@ -28,6 +28,7 @@ class SensorController extends ChangeNotifier {
   bool get nfcAvailable => caps['nfc'] == true;
   bool get nfcEnabled => caps['nfcEnabled'] == true;
   bool get capsKnown => caps.isNotEmpty;
+  String? get bridgeError => bridge.lastError;
 
   Future<void> refresh() async {
     caps = await bridge.capabilities();
@@ -41,6 +42,9 @@ class SensorController extends ChangeNotifier {
   }
 
   Future<void> start() async {
+    if (caps.isEmpty) {
+      await refresh();
+    }
     _sub ??= bridge.events.listen(_onEvent);
     started = await bridge.startSensors();
     sensorsRunning = started.values.any((v) => v == true);

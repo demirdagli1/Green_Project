@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 
 /// Native Android köprüsünün Dart yüzü. Donanım/izin yoksa açıkça false/denied döner.
 abstract class HardwareBridge {
+  String? get lastError => null;
   Future<Map<String, dynamic>> capabilities();
   Future<Map<String, String>> permissionStatus();
   Future<Map<String, String>> requestPermissions(List<String> keys);
@@ -19,16 +20,24 @@ class AndroidHardwareBridge implements HardwareBridge {
   static const MethodChannel _m = MethodChannel('com.yesiladim.ecoclan/hardware');
   static const EventChannel _e = EventChannel('com.yesiladim.ecoclan/events');
 
+  String? _lastError;
+  @override
+  String? get lastError => _lastError;
+
   Map<String, dynamic> _map(Object? o) => o is Map ? o.map((k, v) => MapEntry(k.toString(), v)) : {};
   Map<String, String> _smap(Object? o) => _map(o).map((k, v) => MapEntry(k, v.toString()));
 
   @override
   Future<Map<String, dynamic>> capabilities() async {
     try {
-      return _map(await _m.invokeMethod('capabilities'));
+      final res = _map(await _m.invokeMethod('capabilities'));
+      _lastError = null;
+      return res;
     } on MissingPluginException {
+      _lastError = 'Android donanım kanalı bağlı değil';
       return {};
-    } on PlatformException {
+    } on PlatformException catch (e) {
+      _lastError = 'Donanım sorgu hatası (${e.code})';
       return {};
     }
   }
@@ -118,6 +127,8 @@ class AndroidHardwareBridge implements HardwareBridge {
 /// Testler/platform dışı için: hiçbir donanım yok.
 class NoHardwareBridge implements HardwareBridge {
   final StreamController<Map<String, dynamic>> controller = StreamController.broadcast();
+  @override
+  String? get lastError => null;
   @override
   Future<Map<String, dynamic>> capabilities() async => {};
   @override

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,6 +8,33 @@ import 'package:green_project/services/hardware_bridge.dart';
 import 'package:green_project/services/hub.dart';
 import 'package:green_project/services/sensor_controller.dart';
 import 'package:green_project/services/storage.dart';
+
+class _DelayedHardwareBridge implements HardwareBridge {
+  final StreamController<Map<String, dynamic>> controller = StreamController.broadcast();
+  Map<String, dynamic> nextCaps = {};
+  Map<String, String> nextPerms = {};
+  Map<String, dynamic> nextStarted = {};
+  @override
+  String? get lastError => null;
+  @override
+  Future<Map<String, dynamic>> capabilities() async => nextCaps;
+  @override
+  Future<Map<String, String>> permissionStatus() async => nextPerms;
+  @override
+  Future<Map<String, String>> requestPermissions(List<String> keys) async => nextPerms;
+  @override
+  Future<Map<String, dynamic>> startSensors() async => nextStarted;
+  @override
+  Future<void> stopSensors() async {}
+  @override
+  Future<bool> startNfc() async => true;
+  @override
+  Future<void> stopNfc() async {}
+  @override
+  Future<bool> showNotification(String title, String body) async => true;
+  @override
+  Stream<Map<String, dynamic>> get events => controller.stream;
+}
 
 Future<AppStore> boot(WidgetTester t, {Size size = const Size(360, 640), double textScale = 1.0}) async {
   SharedPreferences.setMockInitialValues({});
@@ -143,5 +171,57 @@ void main() {
     await t.tap(find.byTooltip('Mağaza ve profil'));
     await t.pumpAndSettle();
     expect(t.takeException(), isNull);
+  });
+
+  testWidgets('regresyon: asenkron donanım köprüsü yanıtı sonrası HomeScreen sensör kartı güncellenir', (t) async {
+    SharedPreferences.setMockInitialValues({});
+    final store = AppStore(backend: MemoryStore(), clock: () => DateTime.utc(2026, 10, 26, 9));
+    await store.load();
+    store.register(deviceId: 'dev_hw', name: 'Ali', clanName: 'KTÜ Kanuni');
+    AppStore.instance = store;
+    final bridge = _DelayedHardwareBridge();
+    Hub.sensors = SensorController(bridge: bridge, store: store);
+
+    // İlk karede henüz donanım yanıtı yokken kapalı/bilinmiyor görünür
+    await t.pumpWidget(const GreenProjectApp());
+    await t.pump();
+    expect(find.text('📡 Sensörler kapalı'), findsOneWidget);
+    expect(find.textContaining('Donanım bilgisi alınamadı'), findsOneWidget);
+
+    // Native köprü gerçek cihaz yeteneklerini ve izinlerini döndürdüğünde kart yeniden çizilmelidir
+    bridge.nextCaps = {
+      'stepCounter': true,
+      'accelerometer': true,
+      'gps': true,
+      'locationEnabled': true,
+      'nfc': true,
+      'nfcEnabled': true,
+      'sdk': 36,
+    };
+    bridge.nextPerms = {
+      'activity': 'granted',
+      'location': 'granted',
+      'notifications': 'granted',
+    };
+    bridge.nextStarted = {
+      'stepCounter': true,
+      'accelerometer': true,
+      'gps': true,
+    };
+    await Hub.sensors.refresh();
+    await Hub.sensors.start();
+    await t.pumpAndSettle();
+
+    expect(find.text('📡 Sensörler açık (yalnız uygulama ön plandayken)'), findsOneWidget);
+    expect(find.textContaining('Donanım bilgisi alınamadı'), findsNothing);
+    expect(find.textContaining('Donanım: Adımsayar var • GPS açık • NFC açık (API 36)'), findsOneWidget);
+    expect(find.textContaining('İzinler: Aktivite verildi • Konum verildi • Bildirim verildi'), findsOneWidget);
+
+    // İzinler zaten verilmişken butona basıldığında kullanıcıya bilgi mesajı gösterilir
+    final refreshBtn = find.text('Durumu yenile (İzinler verildi)');
+    await t.ensureVisible(refreshBtn);
+    await t.tap(refreshBtn);
+    await t.pumpAndSettle();
+    expect(find.textContaining('İzinler zaten verilmiş'), findsOneWidget);
   });
 }

@@ -71,7 +71,7 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   _stepsCard(steps, remaining),
                   const SizedBox(height: 12),
-                  const _SensorStatusCard(),
+                  _SensorStatusCard(),
                   const SizedBox(height: 12),
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -290,45 +290,84 @@ class _SensorStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = Hub.sensors;
-    final problems = <String>[];
-    if (s.capsKnown) {
-      if (!s.stepCounterAvailable) problems.add('Cihazda adım sayacı sensörü yok.');
-      if (s.perms['activity'] != 'granted') problems.add('Fiziksel aktivite izni ${_perm(s.perms['activity'])}: adımlar sayılmaz.');
-      if (!s.gpsAvailable) {
-        problems.add('GPS yok.');
-      } else if (!s.locationEnabled) {
-        problems.add('Konum kapalı: bisiklet/hız ölçümü yapılamaz.');
-      }
-      if (s.perms['location'] != 'granted') problems.add('Konum izni ${_perm(s.perms['location'])}.');
-      if (!s.nfcAvailable) problems.add('NFC donanımı yok.');
-    }
-    final permanent = s.perms.values.contains('permanentlyDenied');
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: HomeScreen._card(20),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(s.sensorsRunning ? '📡 Sensörler açık (yalnız uygulama ön plandayken)' : '📡 Sensörler kapalı',
-            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-        const SizedBox(height: 4),
-        if (!s.capsKnown)
-          const Text('Donanım bilgisi alınamadı (Android köprüsü yok).',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-        for (final p in problems) Text('• $p', style: const TextStyle(fontSize: 12, color: AppColors.fireRed)),
-        if (permanent)
-          const Text('Kalıcı ret: izinleri Android Ayarlar > Uygulamalar bölümünden açmalısın.',
-              style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-        const SizedBox(height: 6),
-        Wrap(spacing: 8, children: [
-          OutlinedButton(
-            onPressed: () async {
-              await s.requestAll();
-              await s.start();
-            },
-            child: const Text('İzinleri iste'),
-          ),
-        ]),
-      ]),
+    return ListenableBuilder(
+      listenable: s,
+      builder: (context, _) {
+        final problems = <String>[];
+        if (s.capsKnown) {
+          if (!s.stepCounterAvailable) problems.add('Cihazda adım sayacı sensörü yok.');
+          if (s.perms['activity'] != 'granted') {
+            problems.add('Fiziksel aktivite izni ${_perm(s.perms['activity'])}: adımlar sayılmaz.');
+          }
+          if (!s.gpsAvailable) {
+            problems.add('GPS yok.');
+          } else if (!s.locationEnabled) {
+            problems.add('Konum kapalı: bisiklet/hız ölçümü yapılamaz.');
+          }
+          if (s.perms['location'] != 'granted') problems.add('Konum izni ${_perm(s.perms['location'])}.');
+          if (!s.nfcAvailable) problems.add('NFC donanımı yok.');
+        }
+        final allGranted = s.capsKnown &&
+            s.perms['activity'] == 'granted' &&
+            s.perms['location'] == 'granted' &&
+            s.perms['notifications'] == 'granted';
+        final permanent = s.perms.values.contains('permanentlyDenied');
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: HomeScreen._card(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(s.sensorsRunning ? '📡 Sensörler açık (yalnız uygulama ön plandayken)' : '📡 Sensörler kapalı',
+                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+            const SizedBox(height: 4),
+            if (!s.capsKnown)
+              Text('Donanım bilgisi alınamadı (${s.bridgeError ?? 'Android köprüsü yok'}).',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted))
+            else ...[
+              Text(
+                'Donanım: Adımsayar ${s.stepCounterAvailable ? 'var' : 'yok'} • '
+                'GPS ${s.gpsAvailable ? (s.locationEnabled ? 'açık' : 'kapalı') : 'yok'} • '
+                'NFC ${s.nfcAvailable ? (s.nfcEnabled ? 'açık' : 'kapalı') : 'yok'}'
+                '${s.caps['sdk'] != null ? ' (API ${s.caps['sdk']})' : ''}',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              Text(
+                'İzinler: Aktivite ${_perm(s.perms['activity'])} • '
+                'Konum ${_perm(s.perms['location'])} • '
+                'Bildirim ${_perm(s.perms['notifications'])}',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+            ],
+            for (final p in problems) Text('• $p', style: const TextStyle(fontSize: 12, color: AppColors.fireRed)),
+            if (permanent)
+              const Text('Kalıcı ret: izinleri Android Ayarlar > Uygulamalar bölümünden açmalısın.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+            const SizedBox(height: 6),
+            Wrap(spacing: 8, children: [
+              OutlinedButton(
+                onPressed: () async {
+                  final wasAllGranted = s.perms['activity'] == 'granted' &&
+                      s.perms['location'] == 'granted' &&
+                      s.perms['notifications'] == 'granted';
+                  await s.requestAll();
+                  await s.start();
+                  if (context.mounted && wasAllGranted) {
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        const SnackBar(
+                          content: Text('İzinler zaten verilmiş; donanım ve sensör durumu yenilendi.'),
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                  }
+                },
+                child: Text(allGranted ? 'Durumu yenile (İzinler verildi)' : 'İzinleri iste'),
+              ),
+            ]),
+          ]),
+        );
+      },
     );
   }
 }
