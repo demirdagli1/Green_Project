@@ -9,6 +9,7 @@
 - Bulunan Flutter: /home/girdap/Masaüstü/WordMaster/.tools/flutter/bin/flutter. Ek pub önbelleği: /home/girdap/Masaüstü/WordMaster/.tools/pub-cache. Önceki projeler: WordMaster, itiraf, music-player. ADB: R6CWB01ASJT Samsung SM_A346E. Flutter PATH'te olmaması kurulu olmadığı anlamına gelmez.
 
 ## Çalışma biçimi ve teslim
+- Kaynak sınırı (kullanıcının PC kilitlenmesi bildirimi sonrası): aynı anda yalnız bir test/derleme; Gradle --offline --no-daemon --max-workers=1 ve parallel=false; JVM heap en çok 2 GB, Kotlin heap en çok 768 MB, test --concurrency=1. Önce takılı eski süreç olmadığını ve kullanılabilir RAM'i kontrol et. Ağır llama.cpp/model sunucusu başlatma. RAM 2 GB altına düşerse işi durdurup yöneticiye raporla. Bu sınırlar proje/oturum kapsamında; genel sistem ayarlarını değiştirme.
 - Geniş işi bağımsız yürüt; yöneticiye her dosya için soru sorma. Önce araç/önbellek envanteri, sonra işlevsel Android sürümü, sonra anlamlı testler ve fiziksel cihaz kontrolü. Kaliteyi bozan bir engelde durumu ve seçenekleri bildir.
 - Token tasarrufu: bu dosyayı ve asıl şartnameyi oku; tekrar tekrar uzun plan anlatma. Sonuçları DURUM.md içinde kısa tut: tamamlananlar, doğrulama komutları/sonuçları, gerçek/demo/eksik özellik ayrımı, engeller, sonraki adım. Özetleri en fazla birkaç paragraf tut, büyük logları ayrı dosyaya yaz.
 - Kullanıcı yerel ara commitler istedi: Git yönetimini Codex yapar. Remote https://github.com/demirdagli1/Green_Project; kesinlikle push yok. Alt ajan commit/reset/checkout yapmasın; uygulama işine devam etsin.
