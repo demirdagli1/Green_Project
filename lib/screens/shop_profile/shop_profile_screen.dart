@@ -32,7 +32,7 @@ class ShopProfileScreen extends StatelessWidget {
       };
     }
     if (id == 'default_avatar') return 'Varsayılan Yaprak';
-    final found = store.shopItems.where((i) => i.id == id).firstOrNull;
+    final found = store.findShopItem(id);
     return found?.title ?? id;
   }
 

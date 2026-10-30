@@ -22,6 +22,10 @@ class LeagueTier {
     required this.symbol,
   });
 
+  /// Bireysel lig PNG logo yolu (Logolar/logo-bireysel/lig-bireysel-1.png ... 6.png).
+  /// Klan ligleri için kullanılmaz.
+  String get individualAssetPath => 'Logolar/logo-bireysel/lig-bireysel-$tierNumber.png';
+
   static const List<LeagueTier> allTiers = [
     LeagueTier(
       tierNumber: 1,

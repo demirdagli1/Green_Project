@@ -182,7 +182,7 @@ void main() {
       final a = s.scanTransit('YESILADIM://TRANSIT/TRB-KTU-01', source: 'QR');
       expect(a.ok, true);
       expect(a.points, 3);
-      expect(s.me!.preventedCo2Kg, closeTo(1.22, 1e-9));
+      expect(s.me!.preventedCo2Kg, closeTo(0.58, 1e-9));
       e.advance(const Duration(minutes: 44, seconds: 59));
       final b = s.scanTransit('TRB-KTU-01', source: 'NFC');
       expect(b.ok, false);
@@ -418,15 +418,15 @@ void main() {
       expect(ranked.first.id, 'clan_ktu_kanuni');
       final users = s.rankedUsers();
       expect(users.first.username, 'Zeynep Kaya');
-      // Eşitlik: kullanıcıyı Ahmet ile eşitle
-      final tied = s.rankedUsers().where((u) => u.weeklyPoints == 1200).length;
+      // Tekil puan kontrolü
+      final tied = s.rankedUsers().where((u) => u.weeklyPoints == 5860).length;
       expect(tied, 1);
     });
     test('utanç tablosu: israf CO₂ azalan; cezasızlar hariç', () async {
       final e = Env();
       final s = await e.fresh();
       final board = s.shameBoard();
-      expect(board.first.username, 'Pelin Aydın');
+      expect(board.first.username, 'Pelinsu Yılmaz');
       expect(board.every((u) => u.weeklyCarTaxiTrips > 0), true);
       s.evaluateVehicle(tripId: 'z', avgSpeedKmh: 70, distanceKm: 300, stepDelta: 0, demo: true);
       expect(s.shameBoard().first.id, s.me!.id);

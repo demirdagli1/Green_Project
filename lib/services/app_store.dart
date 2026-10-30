@@ -68,6 +68,7 @@ class AppStore extends ChangeNotifier {
   static set instance(AppStore s) => _instance = s;
 
   static const String storageKey = 'app_state_v2';
+  static const int currentSeedVersion = 3;
   static const double demoTreeCo2Kg = 2.0; // YALNIZCA demo eşdeğer; bilimsel katsayı değil
 
   final KeyValueStore backend;
@@ -82,6 +83,7 @@ class AppStore extends ChangeNotifier {
 
   // ---- durum ----
   bool loaded = false;
+  int seedVersion = currentSeedVersion;
   AppUser? me;
   List<AppUser> demoUsers = List.of(DemoData.users());
   List<Clan> clans = List.of(DemoData.clans());
@@ -143,6 +145,7 @@ class AppStore extends ChangeNotifier {
         debugPrint('Kayıt okunamadı, temiz başlangıç: $e');
       }
     }
+    _applyDataMigrationIfNeeded();
     if (dayId.isEmpty) {
       dayId = dayIdOf(_istanbul);
       weekId = weekIdOf(_istanbul);
@@ -150,6 +153,50 @@ class AppStore extends ChangeNotifier {
     _sync();
     loaded = true;
     notifyListeners();
+  }
+
+  void _applyDataMigrationIfNeeded() {
+    if (seedVersion >= currentSeedVersion) {
+      return;
+    }
+
+    // 1. Gerçek kullanıcı profili ('me') ve tüm alanları KORUNUR (Sen Efe ile ASLA ezilmez).
+    // 2. Demo kullanıcıları SQL verisinden yüklenir (Sen (Efe) isDemo=true olan demo kaydıdır).
+    demoUsers = List.of(DemoData.users());
+
+    // 3. Klanlar: SQLdeki 11 klan güncellenir, SQL dışı mevcut klanlar (ör. Yalnız Gezginler) ve kullanıcının klan katkıları korunur.
+    final defaultClans = DemoData.clans();
+    final Map<String, Clan> clanMap = {for (final c in defaultClans) c.id: c};
+
+    for (final oldClan in clans) {
+      if (!clanMap.containsKey(oldClan.id)) {
+        clanMap[oldClan.id] = oldClan;
+      }
+    }
+
+    if (me != null && clanMap.containsKey(me!.clanId)) {
+      final userClan = clanMap[me!.clanId]!;
+      final userAlreadyCounted = clans.any((c) => c.id == me!.clanId && c.memberCount > userClan.memberCount);
+      clanMap[me!.clanId] = userClan.copyWith(
+        memberCount: userClan.memberCount + (userAlreadyCounted ? 1 : 0),
+        weeklyPoints: userClan.weeklyPoints + me!.weeklyPoints,
+        allTimePoints: userClan.allTimePoints + me!.allTimePoints,
+      );
+    }
+    clans = clanMap.values.toList();
+
+    // 4. Envanter: Satın alınmış ürünler korunur ve legacy aliaslar eklenir.
+    final aliasesToAdd = <String>{};
+    for (final id in owned) {
+      final alias = DemoData.legacyItemAliases[id];
+      if (alias != null) aliasesToAdd.add(alias);
+      final rev = DemoData.itemToLegacyAliases[id];
+      if (rev != null) aliasesToAdd.add(rev);
+    }
+    owned.addAll(aliasesToAdd);
+
+    seedVersion = currentSeedVersion;
+    _commit();
   }
 
   Future<void> _persistChain = Future.value();
@@ -169,6 +216,7 @@ class AppStore extends ChangeNotifier {
   }
 
   Map<String, dynamic> _encode() => {
+        'seedVersion': seedVersion,
         'me': me?.toJson(),
         'demoUsers': demoUsers.map((u) => u.toJson()).toList(),
         'clans': clans.map((c) => c.toJson()).toList(),
@@ -189,6 +237,7 @@ class AppStore extends ChangeNotifier {
       };
 
   void _decode(Map<String, dynamic> j) {
+    seedVersion = (j['seedVersion'] as num?)?.toInt() ?? 1;
     me = j['me'] == null ? null : AppUser.fromJson(j['me'] as Map<String, dynamic>);
     demoUsers = (j['demoUsers'] as List).map((e) => AppUser.fromJson(e as Map<String, dynamic>)).toList();
     clans = (j['clans'] as List).map((e) => Clan.fromJson(e as Map<String, dynamic>)).toList();
@@ -488,15 +537,40 @@ class AppStore extends ChangeNotifier {
   }
 
   // ---------- toplu taşıma ----------
-  /// [payload] QR/NFC metni veya çıplak kod. Cooldown durak kodu başına, QR ve NFC ortak.
+  /// NFC UID (kolonlu/kolonsuz) veya QR/kod payload'ından kanonik durak bulur.
+  TransitStop? findStopByPayload(String? raw) {
+    if (raw == null) return null;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. NFC UID (04:A1:2B:9C:11:80:01 veya 04A12B9C118001 kolonlu/kolonsuz hex)
+    final cleanHex = trimmed.replaceAll(':', '').replaceAll('-', '').toUpperCase();
+    for (final s in stops) {
+      if (s.nfcUid != null) {
+        final stopCleanHex = s.nfcUid!.replaceAll(':', '').replaceAll('-', '').toUpperCase();
+        if (stopCleanHex == cleanHex) return s;
+      }
+    }
+
+    // 2. QR payload veya durak kodu (YESILADIM://TRANSIT/TRB-KTU-01?sig=9f8a7b veya TRB-KTU-01)
+    final code = rules.parseTransitPayload(raw);
+    if (code != null) {
+      final found = stops.where((s) => s.code == code).firstOrNull;
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  /// [payload] QR/NFC metni, NFC UID veya çıplak kod. Cooldown durak kodu başına, QR ve NFC ortak.
   ActionResult scanTransit(String? payload, {required String source, DateTime? at}) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     _sync();
-    final code = rules.parseTransitPayload(payload);
-    if (code == null) return const ActionResult(false, 'Geçersiz QR/NFC verisi.');
-    final idx = stops.indexWhere((s) => s.code == code);
-    if (idx < 0) return ActionResult(false, 'Bilinmeyen durak: $code');
-    final stop = stops[idx];
+    final stop = findStopByPayload(payload);
+    if (stop == null) {
+      final code = rules.parseTransitPayload(payload);
+      return ActionResult(false, code != null ? 'Bilinmeyen durak: $code' : 'Geçersiz QR/NFC verisi.');
+    }
+    final code = stop.code;
     final now = at ?? clock();
     final lastMs = transitLast[code];
     final remaining = rules.transitRemaining(
@@ -507,10 +581,10 @@ class AppStore extends ChangeNotifier {
           'Aynı otobüsü iki kere mi satın aldın? Sonraki biniş puanı için $mins dk bekle!');
     }
     transitLast[code] = now.millisecondsSinceEpoch;
-    _award(3, co2: stop.co2SavingKg);
-    _note('🚌 Biniş onaylandı ($source)', '${stop.name}: +3 puan, ${stop.co2SavingKg.toStringAsFixed(2)} kg CO₂ önlendi.');
+    _award(stop.pointsReward, co2: stop.co2SavingKg);
+    _note('🚌 Biniş onaylandı ($source)', '${stop.name}: +${stop.pointsReward} puan, ${stop.co2SavingKg.toStringAsFixed(2)} kg CO₂ önlendi.');
     _commit();
-    return ActionResult(true, '+3 puan', points: 3, co2Kg: stop.co2SavingKg);
+    return ActionResult(true, '+${stop.pointsReward} puan', points: stop.pointsReward, co2Kg: stop.co2SavingKg);
   }
 
   bool get transitInLast45Min {
@@ -663,15 +737,46 @@ class AppStore extends ChangeNotifier {
   }
 
   // ---------- mağaza ----------
+  /// Aktif katalog, legacy alias ve eski katalogdan ürün bulur.
+  ShopItem? findShopItem(String id) {
+    var found = shopItems.where((s) => s.id == id).firstOrNull;
+    if (found != null) return found;
+    final legacy = DemoData.legacyShopItems.where((s) => s.id == id).firstOrNull;
+    if (legacy != null) return legacy;
+    final alias = DemoData.legacyItemAliases[id];
+    if (alias != null) {
+      found = shopItems.where((s) => s.id == alias).firstOrNull;
+      if (found != null) return found;
+    }
+    final revAlias = DemoData.itemToLegacyAliases[id];
+    if (revAlias != null) {
+      found = shopItems.where((s) => s.id == revAlias).firstOrNull;
+      if (found != null) return found;
+    }
+    return null;
+  }
+
+  /// Bir ürünün veya legacy aliasının kullanıcıda olup olmadığını kontrol eder.
+  bool isItemOwned(String id) {
+    if (owned.contains(id)) return true;
+    final alias = DemoData.legacyItemAliases[id];
+    if (alias != null && owned.contains(alias)) return true;
+    final rev = DemoData.itemToLegacyAliases[id];
+    if (rev != null && owned.contains(rev)) return true;
+    return false;
+  }
+
   ActionResult buy(String itemId) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
-    final i = shopItems.indexWhere((s) => s.id == itemId);
-    if (i < 0) return const ActionResult(false, 'Ürün yok.');
-    final item = shopItems[i];
-    if (owned.contains(itemId)) return const ActionResult(false, 'Zaten sahipsin.', duplicate: true);
+    final item = findShopItem(itemId);
+    if (item == null) return const ActionResult(false, 'Ürün yok.');
+    if (isItemOwned(itemId)) return const ActionResult(false, 'Zaten sahipsin.', duplicate: true);
     if (me!.goldCoins < item.price) return const ActionResult(false, 'Yetersiz altın.');
     me = me!.copyWith(goldCoins: me!.goldCoins - item.price);
+    owned.add(item.id);
     owned.add(itemId);
+    if (DemoData.legacyItemAliases.containsKey(item.id)) owned.add(DemoData.legacyItemAliases[item.id]!);
+    if (DemoData.itemToLegacyAliases.containsKey(item.id)) owned.add(DemoData.itemToLegacyAliases[item.id]!);
     _equip(item);
     _commit();
     return ActionResult(true, '${item.title} alındı.');
@@ -684,10 +789,10 @@ class AppStore extends ChangeNotifier {
       _commit();
       return const ActionResult(true, 'Varsayılan avatar kuşanıldı.');
     }
-    final i = shopItems.indexWhere((s) => s.id == itemId);
-    if (i < 0) return const ActionResult(false, 'Ürün yok.');
-    if (!owned.contains(itemId)) return const ActionResult(false, 'Ürün kilitli.');
-    _equip(shopItems[i]);
+    final item = findShopItem(itemId);
+    if (item == null) return const ActionResult(false, 'Ürün yok.');
+    if (!isItemOwned(itemId)) return const ActionResult(false, 'Ürün kilitli.');
+    _equip(item);
     _commit();
     return const ActionResult(true, 'Kuşanıldı.');
   }

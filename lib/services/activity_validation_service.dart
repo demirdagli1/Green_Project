@@ -46,6 +46,11 @@ class ActivityValidationService {
     if (raw == null) return null;
     var s = raw.trim();
     if (s.isEmpty) return null;
+    // URL query string'i varsa (?sig=... demo imzası vb.) ayıkla
+    final qIdx = s.indexOf('?');
+    if (qIdx >= 0) {
+      s = s.substring(0, qIdx).trim();
+    }
     const prefix = 'YESILADIM://TRANSIT/';
     if (s.toUpperCase().startsWith(prefix)) s = s.substring(prefix.length);
     s = s.trim().toUpperCase();

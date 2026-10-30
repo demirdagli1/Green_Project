@@ -16,6 +16,6 @@ Kaynak: `supabase_schema_ve_mockup_veriler.sql` ve `Logolar/logo-bireysel/lig-bi
 
 ## Teslim kapısı
 - Mevcut 103 testi koru; gerekli değişen beklentileri yeni seed değerlerine göre dürüstçe güncelle, hata gizleme. Veri yükseltmesinin gerçek kullanıcıyı/envanteri koruması ve tekrar load etkisizliği gibi kritik davranışlara anlamlı regresyon testleri ekle. Sadece asset adlarını tekrar eden gereksiz test yazma.
-- Analyze, ilgili testler ve tek iş çevrimdışı APK derle. Releases APK/hash/sürüm notunu güncelle; telefonda elle test kullanıcıda, otomatik gezinme yok. Kullanıcı ayrıca kurulum istemedikçe telefonu mevcut ekranda bırak.
+- Analyze, ilgili testler ve tek iş çevrimdışı APK derle. Releases APK/hash/sürüm notunu güncelle; telefonda elle test kullanıcıda, otomatik gezinme yok. Kod ajanı cihaz kurulumu yapmasın; yeni sürümü kullanıcıya göstermek için veri koruyan APK güncellemesini yönetici yapar, ekranda otomatik gezmez.
 - `MOCKUP_ESLEME.md` gibi kısa bir MD ile kaynak sayıları, tamsayı→kalıcı ID ve ürün alias eşlemesi, veri yükseltmesi, eksik görseller ve SQL tier çelişkisini bir yerde belgele. README/DURUM/OTURUM_DEVAM bu paketin gerçek durumuyla güncellensin. Token/GPS/UUID raw cihaz verisini dokümana yazma.
 - Yeni Supabase deployment, ertelenmiş otobüs durak/500mceza fikirleri veya başka tasarım değişikliği yok. Geniş işi bağımsız bitir; her dosyada yöneticiye onay sorma. Sonuç kısa, gerçek ve kanıtlı olsun.

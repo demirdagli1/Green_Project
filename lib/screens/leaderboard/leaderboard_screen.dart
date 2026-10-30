@@ -8,6 +8,7 @@ import '../../core/utils/name_masker.dart';
 import '../../models/app_user.dart';
 import '../../models/clan.dart';
 import '../../models/league_tier.dart';
+import '../../widgets/individual_league_badge.dart';
 import '../../services/hub.dart';
 
 class LeaderboardScreen extends StatefulWidget {
@@ -326,16 +327,9 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       );
     }
 
-    final leagueBadge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(
-        color: tier.color,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        tier.symbol,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
-      ),
+    final leagueBadge = IndividualLeagueBadge(
+      tier: tier,
+      size: 20,
     );
 
     return _row(

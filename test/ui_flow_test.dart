@@ -92,7 +92,7 @@ void main() {
     await t.tap(find.text('🚨 Utanç'));
     await t.pumpAndSettle();
     expect(find.text('Pel***'), findsOneWidget);
-    expect(find.text('Pelin Aydın'), findsNothing);
+    expect(find.text('Pelinsu Yılmaz'), findsNothing);
     expect(find.text('Oğu***'), findsOneWidget);
     await t.tap(find.text('Klan'));
     await t.pumpAndSettle();
@@ -127,12 +127,12 @@ void main() {
     await t.tap(find.byTooltip('Mağaza ve profil'));
     await t.pumpAndSettle();
     final btn = find.text('500 🪙');
-    await t.ensureVisible(btn);
+    await t.scrollUntilVisible(btn, 200, scrollable: find.byType(Scrollable).last);
     await t.tap(btn);
     await t.tap(btn, warnIfMissed: false);
     await t.pumpAndSettle();
     expect(store.me!.goldCoins, 0);
-    expect(store.owned.contains('leaf_warrior'), true);
+    expect(store.owned.contains('ava_ktu_mountaineer'), true);
   });
 
   testWidgets('QR/NFC sayfası: kamera yok uyarısı, manuel kod, cooldown mesajı, klavye', (t) async {

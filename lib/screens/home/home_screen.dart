@@ -6,6 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/clan.dart';
 import '../../models/league_tier.dart';
 import '../../services/app_store.dart';
+import '../../widgets/individual_league_badge.dart';
 import '../../services/auto_motion_engine.dart';
 import '../../services/hub.dart';
 
@@ -445,13 +446,7 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: tier.color, borderRadius: BorderRadius.circular(10)),
-                  child: Text(tier.symbol, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
-                ),
+                IndividualLeagueBadge(tier: tier, size: 34),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Column(

@@ -19,3 +19,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - Logolar/logo-bireysel/lig-bireysel-1.png
+    - Logolar/logo-bireysel/lig-bireysel-2.png
+    - Logolar/logo-bireysel/lig-bireysel-3.png
+    - Logolar/logo-bireysel/lig-bireysel-4.png
+    - Logolar/logo-bireysel/lig-bireysel-5.png
+    - Logolar/logo-bireysel/lig-bireysel-6.png
