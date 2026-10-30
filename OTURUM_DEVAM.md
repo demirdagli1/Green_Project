@@ -2,6 +2,8 @@
 
 Bu dosya DEVAM_RAPORU.md ve önceki ara anlık görüntülerinin önüne geçer.
 
+**23:06 cihaz güncellemesi:** Kullanıcı telefonu tekrar bağladı. Son APK `adb install -r` ile başarıyla kuruldu ve açıldı; profil/altın/kuşanılan ürünler korundu. Ana sayfa, sıralama ve profil görüntülendi, GM HTTP200 verdi; sensör/ivme olay akışı açıktı. Kullanıcı artık elle cihaz testlerini kendisi yapacak; telefona otomatik tıklamalarla müdahale etme. Mock-up verisini klasöre koyduğunu söyledi ancak kök/alt klasör aramasında henüz bulunamadı; dosya adı/tam yolu async soruldu, yanıt bekleniyor. Supabase hâlâ bağlı değil, durum kullanıcıya açıkça anlatıldı; yerel state cihazlar arasında senkronize olmaz.
+
 **Son bağımsız yönetici kontrolü:** `evidence/final_verified_tests.log` 103/103 başarılı; `evidence/final_analyze.log` temiz. APK hash ve build çıktısıyla karşılaştırma kontrolü başarılı. Telefon hâlâ bağlı değil; fiziksel yeni sürüm kurulumu/yürüyüş/fotoğraf/otomatik mod saha doğrulaması bekliyor. Kozmetik/mock veri, canlı backend/kameraQR ve ertelenmiş otobüs fikirleri gerçek açık sınırlardır; sonraki oturumda bunları tamamlandı sanma.
 
 **22:58 güncellemesi (Aşama B, C, D Tamamlandı & Doğrulandı):**
