@@ -16,6 +16,8 @@ class AppUser {
   final String equippedAvatar;
   final String equippedFrame;
   final String equippedPet;
+  final String? photoPath;
+  final String bio;
 
   const AppUser({
     required this.id,
@@ -35,6 +37,8 @@ class AppUser {
     this.equippedAvatar = 'default_avatar',
     this.equippedFrame = 'none',
     this.equippedPet = 'none',
+    this.photoPath,
+    this.bio = '',
   });
 
   AppUser copyWith({
@@ -52,6 +56,9 @@ class AppUser {
     String? equippedAvatar,
     String? equippedFrame,
     String? equippedPet,
+    String? photoPath,
+    bool clearPhoto = false,
+    String? bio,
   }) {
     return AppUser(
       id: id,
@@ -71,6 +78,8 @@ class AppUser {
       equippedAvatar: equippedAvatar ?? this.equippedAvatar,
       equippedFrame: equippedFrame ?? this.equippedFrame,
       equippedPet: equippedPet ?? this.equippedPet,
+      photoPath: clearPhoto ? null : (photoPath ?? this.photoPath),
+      bio: bio ?? this.bio,
     );
   }
 
@@ -92,6 +101,8 @@ class AppUser {
         'equipped_avatar': equippedAvatar,
         'equipped_frame': equippedFrame,
         'equipped_pet': equippedPet,
+        'photo_path': photoPath,
+        'bio': bio,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -112,5 +123,7 @@ class AppUser {
         equippedAvatar: j['equipped_avatar'] as String? ?? 'default_avatar',
         equippedFrame: j['equipped_frame'] as String? ?? 'none',
         equippedPet: j['equipped_pet'] as String? ?? 'none',
+        photoPath: j['photo_path'] as String?,
+        bio: j['bio'] as String? ?? '',
       );
 }

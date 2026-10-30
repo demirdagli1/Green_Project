@@ -17,11 +17,15 @@ class Clan {
   bool get isEligibleForRanking => memberCount >= 5;
 
   /// Hibrit formül: (Toplam Puan * 0.6) + (Üye Ortalaması * 50 * 0.4)
-  double get hybridScore {
+  /// [allTime] true ise allTimePoints üzerinden hesaplanır.
+  double hybridScoreFor({bool allTime = false}) {
+    final pts = allTime ? allTimePoints : weeklyPoints;
     if (memberCount <= 0) return 0.0;
-    final avg = weeklyPoints / memberCount;
-    return (weeklyPoints * 0.6) + (avg * 50 * 0.4);
+    final avg = pts / memberCount;
+    return (pts * 0.6) + (avg * 50 * 0.4);
   }
+
+  double get hybridScore => hybridScoreFor(allTime: false);
 
   Clan copyWith({int? memberCount, int? weeklyPoints, int? allTimePoints}) => Clan(
         id: id,

@@ -1,10 +1,14 @@
 package com.yesiladim.ecoclan.green_project
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
@@ -18,6 +22,7 @@ import android.nfc.tech.Ndef
 import android.os.Build
 import android.os.Bundle
 import android.os.Looper
+import android.provider.MediaStore
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -26,6 +31,8 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
+import java.io.FileOutputStream
 import kotlin.math.abs
 import kotlin.math.sqrt
 
@@ -40,9 +47,11 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
     private val eventName = "com.yesiladim.ecoclan/events"
     private val notifChannelId = "yesil_adim_bildirim_v2"
     private val permRequestCode = 4711
+    private val photoPickerRequestCode = 4712
 
     private var sink: EventChannel.EventSink? = null
     private var pendingPermResult: MethodChannel.Result? = null
+    private var pendingPhotoResult: MethodChannel.Result? = null
     private var sensorsOn = false
     private var nfcOn = false
 
@@ -96,6 +105,7 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
                     result.success(false)
                 }
             }
+            "pickImage" -> pickImage(result)
             else -> result.notImplemented()
         }
     }
@@ -155,6 +165,97 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
         if (code == permRequestCode) {
             pendingPermResult?.success(permissionStatus())
             pendingPermResult = null
+        }
+    }
+
+    // ---- Fotoğraf Seçici (Photo Picker / Open Document) ----
+    private fun pickImage(result: MethodChannel.Result) {
+        if (pendingPhotoResult != null) {
+            result.error("BUSY", "Önceki görsel seçimi henüz tamamlanmadı.", null)
+            return
+        }
+        pendingPhotoResult = result
+        try {
+            val intent = if (Build.VERSION.SDK_INT >= 33) {
+                Intent(MediaStore.ACTION_PICK_IMAGES).apply {
+                    type = "image/*"
+                }
+            } else {
+                Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "image/*"
+                }
+            }
+            startActivityForResult(intent, photoPickerRequestCode)
+        } catch (_: Exception) {
+            try {
+                val fallback = Intent(Intent.ACTION_GET_CONTENT).apply {
+                    type = "image/*"
+                }
+                startActivityForResult(fallback, photoPickerRequestCode)
+            } catch (e: Exception) {
+                pendingPhotoResult?.error("PICKER_UNAVAILABLE", e.message, null)
+                pendingPhotoResult = null
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == photoPickerRequestCode) {
+            val currentResult = pendingPhotoResult
+            pendingPhotoResult = null
+            if (currentResult == null) return
+
+            if (resultCode != Activity.RESULT_OK || data == null || data.data == null) {
+                currentResult.success(null)
+                return
+            }
+
+            val uri = data.data!!
+            Thread {
+                try {
+                    val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    contentResolver.openInputStream(uri)?.use { stream ->
+                        BitmapFactory.decodeStream(stream, null, boundsOptions)
+                    }
+
+                    if (boundsOptions.outWidth <= 0 || boundsOptions.outHeight <= 0) {
+                        runOnUiThread { currentResult.error("INVALID_IMAGE", "Görsel formatı okunamadı.", null) }
+                        return@Thread
+                    }
+
+                    val maxDim = 1024
+                    var sampleSize = 1
+                    var w = boundsOptions.outWidth
+                    var h = boundsOptions.outHeight
+                    while (w > maxDim * 2 || h > maxDim * 2) {
+                        sampleSize *= 2
+                        w /= 2
+                        h /= 2
+                    }
+
+                    val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                    val bitmap = contentResolver.openInputStream(uri)?.use { stream ->
+                        BitmapFactory.decodeStream(stream, null, decodeOptions)
+                    }
+
+                    if (bitmap == null) {
+                        runOnUiThread { currentResult.error("DECODE_ERROR", "Görsel çözülemedi.", null) }
+                        return@Thread
+                    }
+
+                    val destFile = File(filesDir, "profile_photo.jpg")
+                    FileOutputStream(destFile).use { out ->
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, out)
+                    }
+                    bitmap.recycle()
+
+                    runOnUiThread { currentResult.success(destFile.absolutePath) }
+                } catch (e: Exception) {
+                    runOnUiThread { currentResult.error("IO_ERROR", e.message, null) }
+                }
+            }.start()
         }
     }
 

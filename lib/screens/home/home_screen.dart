@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/name_masker.dart';
+import '../../models/app_user.dart';
+import '../../models/clan.dart';
 import '../../models/league_tier.dart';
 import '../../services/app_store.dart';
 import '../../services/hub.dart';
@@ -8,8 +11,14 @@ import '../../services/hub.dart';
 class HomeScreen extends StatelessWidget {
   final VoidCallback? onOpenLeaderboardClan;
   final VoidCallback? onOpenLeaderboardIndividual;
+  final VoidCallback? onOpenLeaderboardShame;
 
-  const HomeScreen({super.key, this.onOpenLeaderboardClan, this.onOpenLeaderboardIndividual});
+  const HomeScreen({
+    super.key,
+    this.onOpenLeaderboardClan,
+    this.onOpenLeaderboardIndividual,
+    this.onOpenLeaderboardShame,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -71,47 +80,31 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   _stepsCard(steps, remaining),
                   const SizedBox(height: 12),
+                  // Birleşik Lig + Sıra Kartları (Klan ve Birey tek kartlarda)
                   LayoutBuilder(
                     builder: (context, constraints) {
-                      final isNarrow = constraints.maxWidth < 300;
+                      final isNarrow = constraints.maxWidth < 450;
                       if (isNarrow) {
                         return Column(
                           children: [
-                            _leagueCard('Lig klan', clanTier.clanName, clanTier.symbol, clanTier.color),
-                            const SizedBox(height: 8),
-                            _leagueCard('Lig birey', indTier.individualName, indTier.symbol, indTier.color),
-                            const SizedBox(height: 8),
-                            _rankCard('Klan sırası', clanRank > 0 ? 'Bu hafta $clanRank.' : 'Sıralama dışı',
-                                '${clan?.weeklyPoints ?? 0} P', Icons.shield_outlined, onOpenLeaderboardClan),
-                            const SizedBox(height: 8),
-                            _rankCard('Birey sırası', 'Bu hafta $userRank.', '${user.weeklyPoints} P',
-                                Icons.person_outline, onOpenLeaderboardIndividual),
+                            _unifiedClanCard(clan, clanTier, clanRank, onOpenLeaderboardClan),
+                            const SizedBox(height: 10),
+                            _unifiedIndividualCard(user, indTier, userRank, onOpenLeaderboardIndividual),
                           ],
                         );
                       }
-                      return Column(
+                      return Row(
                         children: [
-                          Row(children: [
-                            Expanded(child: _leagueCard('Lig klan', clanTier.clanName, clanTier.symbol, clanTier.color)),
-                            const SizedBox(width: 12),
-                            Expanded(child: _leagueCard('Lig birey', indTier.individualName, indTier.symbol, indTier.color)),
-                          ]),
-                          const SizedBox(height: 12),
-                          Row(children: [
-                            Expanded(
-                              child: _rankCard('Klan sırası', clanRank > 0 ? 'Bu hafta $clanRank.' : 'Sıralama dışı',
-                                  '${clan?.weeklyPoints ?? 0} P', Icons.shield_outlined, onOpenLeaderboardClan),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: _rankCard('Birey sırası', 'Bu hafta $userRank.', '${user.weeklyPoints} P',
-                                  Icons.person_outline, onOpenLeaderboardIndividual),
-                            ),
-                          ]),
+                          Expanded(child: _unifiedClanCard(clan, clanTier, clanRank, onOpenLeaderboardClan)),
+                          const SizedBox(width: 12),
+                          Expanded(child: _unifiedIndividualCard(user, indTier, userRank, onOpenLeaderboardIndividual)),
                         ],
                       );
                     },
                   ),
+                  const SizedBox(height: 12),
+                  // Maskeli Ana Sayfa Utanç Tablosu Özeti + Tam Tabloya Geçiş
+                  _shameSummaryCard(store, onOpenLeaderboardShame),
                   const SizedBox(height: 12),
                   _co2Card(user.preventedCo2Kg, trees),
                   const SizedBox(height: 8),
@@ -128,16 +121,24 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _championBanner(AppStore store) => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFFFEF3C7), Color(0xFFD1FAE5)]),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Text('👑 Geçen Haftanın Şampiyonları: ${store.championUser} & ${store.championClan}',
-            style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF065F46))),
-      );
+  Widget _championBanner(AppStore store) {
+    final hasReal = store.championUser != '—' && store.championClan != '—' && store.championUser.isNotEmpty;
+    final userChamp = hasReal ? store.championUser : 'Zeynep Kaya';
+    final clanChamp = hasReal ? store.championClan : 'KTÜ Kanuni';
+    final demoTag = hasReal ? '' : ' [DEMO]';
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(colors: [Color(0xFFFEF3C7), Color(0xFFD1FAE5)]),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        '👑 Geçen Haftanın Şampiyonları$demoTag: $userChamp & $clanChamp',
+        style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF065F46)),
+      ),
+    );
+  }
 
   Widget _stepsCard(int steps, int remaining) => Container(
         width: double.infinity,
@@ -176,6 +177,267 @@ class HomeScreen extends StatelessWidget {
               style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF047857))),
         ]),
       );
+
+  Widget _unifiedClanCard(Clan? clan, LeagueTier tier, int clanRank, VoidCallback? onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: _card(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Klanım & Sıram',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                  ),
+                ),
+                const Icon(Icons.shield_outlined, size: 16, color: AppColors.primaryPurple),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: tier.color, borderRadius: BorderRadius.circular(10)),
+                  child: Text(tier.symbol, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        clan != null ? clan.name : 'Klan Yok',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                      ),
+                      Text(
+                        '${tier.clanName} • ${clan?.memberCount ?? 0} üye',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      clanRank > 0 ? '#$clanRank. Sırada' : 'Sıralama dışı',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primaryPurple),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${clan?.hybridScore.toStringAsFixed(0) ?? 0} H',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _unifiedIndividualCard(AppUser user, LeagueTier tier, int userRank, VoidCallback? onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: _card(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Bireysel Ligim & Sıram',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                  ),
+                ),
+                const Icon(Icons.person_outline, size: 16, color: AppColors.primaryPurple),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(color: tier.color, borderRadius: BorderRadius.circular(10)),
+                  child: Text(tier.symbol, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        user.username,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                      ),
+                      Text(
+                        tier.individualName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(8)),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Text(
+                      userRank > 0 ? '#$userRank. Sırada' : '—',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primaryPurple),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${user.weeklyPoints} P',
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textDark),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _shameSummaryCard(AppStore store, VoidCallback? onOpenShame) {
+    final list = store.shameBoard();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: _card(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
+            children: [
+              const Text(
+                '🚨 Utanç Tablosu Özeti',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: Color(0xFF991B1B)),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                ),
+                onPressed: onOpenShame,
+                child: const Text('Tam Tabloyu Gör >', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          if (list.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Bu hafta kimse utanç tablosunda değil. 🎉',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+            )
+          else ...[
+            for (var i = 0; i < list.take(3).length; i++) ...[
+              Container(
+                margin: const EdgeInsets.only(top: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECACA), width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Text('#${i + 1}', style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 12, color: AppColors.fireRed)),
+                    const SizedBox(width: 6),
+                    const CircleAvatar(radius: 12, backgroundColor: Color(0xFFFCA5A5), child: Text('🚕', style: TextStyle(fontSize: 10))),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            NameMasker.maskShameName(list[i].username),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                          ),
+                          Text(
+                            '${list[i].weeklyCarTaxiTrips} yolculuk',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Flexible(
+                      flex: 0,
+                      child: Text(
+                        '${list[i].weeklyWastedCo2Kg.toStringAsFixed(1)} kg',
+                        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11, color: Color(0xFF991B1B)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ],
+      ),
+    );
+  }
 
   Widget _co2Card(double kg, int trees) => Container(
         width: double.infinity,
@@ -228,48 +490,5 @@ class HomeScreen extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(14)),
         child: Text(t, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: fg)),
-      );
-
-  static Widget _leagueCard(String title, String name, String symbol, Color color) => Container(
-        padding: const EdgeInsets.all(14),
-        decoration: _card(20),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(title, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-          const SizedBox(height: 8),
-          Row(children: [
-            Container(
-              width: 38,
-              height: 38,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(10)),
-              child: Text(symbol, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800)),
-            ),
-          ]),
-        ]),
-      );
-
-  static Widget _rankCard(String title, String rank, String sub, IconData icon, VoidCallback? onTap) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: _card(20),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              Flexible(child: Text(title, style: const TextStyle(fontSize: 11, color: AppColors.textMuted))),
-              Icon(icon, size: 16, color: AppColors.primaryPurple),
-            ]),
-            const SizedBox(height: 6),
-            Text(rank, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900)),
-            Text(sub, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-          ]),
-        ),
       );
 }

@@ -41,6 +41,8 @@ class SensorController extends ChangeNotifier {
     await refresh();
   }
 
+  Future<String?> pickProfileImage() => bridge.pickProfileImage();
+
   Future<void> start() async {
     if (caps.isEmpty) {
       await refresh();

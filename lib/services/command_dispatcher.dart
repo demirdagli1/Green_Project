@@ -236,6 +236,15 @@ class CommandDispatcher {
         final r = store.flushPendingStepsWindow();
         return CommandResult(ok: r.ok, message: r.message);
 
+      case 'set_bio':
+        final bio = (p['bio'] as String?) ?? '';
+        if (bio.runes.length > 160) {
+          return const CommandResult(ok: false, message: 'Biyografi en fazla 160 karakter olabilir.');
+        }
+        if (store.me == null) return const CommandResult(ok: false, message: 'Profil yok.');
+        final r = store.updateBio(bio);
+        return CommandResult(ok: r.ok, message: r.message, data: {'bio': store.me?.bio});
+
       default:
         return CommandResult(ok: false, message: 'Bilinmeyen komut: $cmd');
     }

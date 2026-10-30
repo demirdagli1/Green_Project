@@ -675,6 +675,31 @@ class AppStore extends ChangeNotifier {
     }
   }
 
+  /// Profil biyografisini günceller (en fazla 160 karakter).
+  ActionResult updateBio(String bioText) {
+    if (me == null) return const ActionResult(false, 'Profil yok.');
+    final trimmed = bioText.trim();
+    if (trimmed.runes.length > 160) {
+      return const ActionResult(false, 'Biyografi en fazla 160 karakter olabilir.');
+    }
+    me = me!.copyWith(bio: trimmed);
+    _commit();
+    return const ActionResult(true, 'Biyografi güncellendi.');
+  }
+
+  /// Profil fotoğrafı yolunu günceller veya temizler.
+  ActionResult updateProfilePhoto(String? path) {
+    if (me == null) return const ActionResult(false, 'Profil yok.');
+    if (path == null) {
+      me = me!.copyWith(clearPhoto: true);
+      _commit();
+      return const ActionResult(true, 'Profil fotoğrafı kaldırıldı.');
+    }
+    me = me!.copyWith(photoPath: path);
+    _commit();
+    return const ActionResult(true, 'Profil fotoğrafı güncellendi.');
+  }
+
   /// DEMO: jüri masası altın.
   ActionResult demoGrantGold(int n) {
     if (me == null || n <= 0) return const ActionResult(false, 'Geçersiz.');
@@ -700,7 +725,7 @@ class AppStore extends ChangeNotifier {
       ..sort(compareUsers);
     if (everyone.isNotEmpty) championUser = everyone.first.username;
     final cl = clans.where((c) => c.isEligibleForRanking && c.weeklyPoints > 0).toList()
-      ..sort((a, b) => compareClans(a, b, hybrid: false));
+      ..sort((a, b) => compareClans(a, b, hybrid: true));
     if (cl.isNotEmpty) championClan = cl.first.name;
     // 2) puan → altın (bir kez), haftalık alanlar sıfır; günlük adım/streak/envanter korunur
     AppUser conv(AppUser u) => u.copyWith(
@@ -726,9 +751,9 @@ class AppStore extends ChangeNotifier {
     return n != 0 ? n : a.id.compareTo(b.id);
   }
 
-  static int compareClans(Clan a, Clan b, {required bool hybrid, bool allTime = false}) {
-    final av = hybrid ? a.hybridScore : (allTime ? a.allTimePoints.toDouble() : a.weeklyPoints.toDouble());
-    final bv = hybrid ? b.hybridScore : (allTime ? b.allTimePoints.toDouble() : b.weeklyPoints.toDouble());
+  static int compareClans(Clan a, Clan b, {bool hybrid = true, bool allTime = false}) {
+    final av = hybrid ? a.hybridScoreFor(allTime: allTime) : (allTime ? a.allTimePoints.toDouble() : a.weeklyPoints.toDouble());
+    final bv = hybrid ? b.hybridScoreFor(allTime: allTime) : (allTime ? b.allTimePoints.toDouble() : b.weeklyPoints.toDouble());
     final c = bv.compareTo(av);
     if (c != 0) return c;
     final n = a.name.compareTo(b.name);
@@ -746,7 +771,7 @@ class AppStore extends ChangeNotifier {
     return l;
   }
 
-  List<Clan> rankedClans({bool hybrid = false, bool allTime = false}) =>
+  List<Clan> rankedClans({bool hybrid = true, bool allTime = false}) =>
       clans.where((c) => c.isEligibleForRanking).toList()..sort((a, b) => compareClans(a, b, hybrid: hybrid, allTime: allTime));
 
   List<AppUser> shameBoard() {

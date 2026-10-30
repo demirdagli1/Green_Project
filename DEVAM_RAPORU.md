@@ -1,5 +1,7 @@
 # Devam raporu — 30 Ekim 2026, 22:20
 
+**Daha güncel devam noktası:** [OTURUM_DEVAM.md](OTURUM_DEVAM.md). Bu dosya eski anlık görüntüdür; aktif süreç ve test sonucu için yeni dosyayı esas al.
+
 ## Yetki ve sınırlar
 Codex yalnız yönetim/inceleme/Git/doküman işlerini yapar; ürün kodu ve testleri AGY yazar. Son istek: AGY Gemini3.8FlashHigh. Yeni indirme yok; yerel SDK/cache kullanılır. Tek test/derleme,2GBGradleheap/tekworker; push kesinlikle yok. Kullanıcı sistemde RAM kilitlenmesi yaşamıştı, yeniden başlatma sonrası açık llama.cpp bulunmadı.
 

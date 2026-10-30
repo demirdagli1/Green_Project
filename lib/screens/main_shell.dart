@@ -15,8 +15,11 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
-  int _index = 0;
+  // Varsayılan: Ana Menü (index 1)
+  int _index = 1;
   String _lbCategory = 'individual';
+  bool _lbShame = false;
+  bool _lbHighlightSelf = false;
   int _lbNonce = 0;
 
   @override
@@ -47,68 +50,89 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     }
   }
 
-  void _openSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => const QrNfcBikeModal(),
-    );
+  void _openLeaderboard(String cat, {bool highlightSelf = false}) {
+    setState(() {
+      _lbCategory = cat;
+      _lbShame = false;
+      _lbHighlightSelf = highlightSelf;
+      _lbNonce++;
+      _index = 2; // Sıralamalar sekmesi
+    });
   }
 
-  void _openLeaderboard(String cat) => setState(() {
-        _lbCategory = cat;
-        _lbNonce++;
-        _index = 1;
-      });
+  void _openLeaderboardShame() {
+    setState(() {
+      _lbCategory = 'individual';
+      _lbShame = true;
+      _lbHighlightSelf = false;
+      _lbNonce++;
+      _index = 2; // Sıralamalar sekmesi
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
+      const QrNfcBikeModal(isTab: true),
       HomeScreen(
-        onOpenLeaderboardClan: () => _openLeaderboard('clan'),
-        onOpenLeaderboardIndividual: () => _openLeaderboard('individual'),
+        onOpenLeaderboardClan: () => _openLeaderboard('clan', highlightSelf: true),
+        onOpenLeaderboardIndividual: () => _openLeaderboard('individual', highlightSelf: true),
+        onOpenLeaderboardShame: _openLeaderboardShame,
       ),
-      LeaderboardScreen(key: ValueKey('lb$_lbNonce'), initialCategory: _lbCategory),
+      LeaderboardScreen(
+        key: ValueKey('lb$_lbNonce'),
+        initialCategory: _lbCategory,
+        initialShame: _lbShame,
+        highlightSelf: _lbHighlightSelf,
+      ),
       const ShopProfileScreen(),
     ];
+
     return PopScope(
-      canPop: _index == 0,
+      canPop: _index == 1,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) setState(() => _index = 0);
+        if (!didPop) {
+          setState(() => _index = 1);
+        }
       },
       child: Scaffold(
         body: IndexedStack(index: _index, children: pages),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        floatingActionButton: FloatingActionButton.extended(
-          backgroundColor: AppColors.primaryPurple,
-          onPressed: _openSheet,
-          icon: const Icon(Icons.directions_bus, color: Colors.white),
-          label: const Text('QR / NFC', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
-        ),
-        bottomNavigationBar: BottomAppBar(
-          color: Colors.white,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              IconButton(
-                tooltip: 'Ana sayfa',
-                icon: Icon(Icons.home_filled, color: _index == 0 ? AppColors.primaryPurple : AppColors.textMuted),
-                onPressed: () => setState(() => _index = 0),
-              ),
-              const SizedBox(width: 96),
-              IconButton(
-                tooltip: 'Sıralama',
-                icon: Icon(Icons.leaderboard_rounded, color: _index == 1 ? AppColors.primaryPurple : AppColors.textMuted),
-                onPressed: () => _openLeaderboard('individual'),
-              ),
-              IconButton(
-                tooltip: 'Mağaza ve profil',
-                icon: Icon(Icons.storefront_rounded, color: _index == 2 ? AppColors.primaryPurple : AppColors.textMuted),
-                onPressed: () => setState(() => _index = 2),
-              ),
-            ],
-          ),
+        bottomNavigationBar: BottomNavigationBar(
+          currentIndex: _index,
+          onTap: (i) {
+            if (i == 2) {
+              _lbHighlightSelf = false;
+            }
+            setState(() => _index = i);
+          },
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: AppColors.primaryPurple,
+          unselectedItemColor: AppColors.textMuted,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+          unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
+          items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.qr_code_scanner),
+              label: 'QR / NFC',
+              tooltip: 'QR / NFC',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_filled),
+              label: 'Ana Menü',
+              tooltip: 'Ana sayfa',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.leaderboard_rounded),
+              label: 'Sıralamalar',
+              tooltip: 'Sıralama',
+            ),
+            BottomNavigationBarItem(
+              icon: Icon(Icons.person_rounded),
+              label: 'Profil',
+              tooltip: 'Mağaza ve profil',
+            ),
+          ],
         ),
       ),
     );

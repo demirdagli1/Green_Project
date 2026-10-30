@@ -36,6 +36,8 @@ class _DelayedHardwareBridge implements HardwareBridge {
   @override
   Future<bool> openAppSettings() async => true;
   @override
+  Future<String?> pickProfileImage() async => null;
+  @override
   Stream<Map<String, dynamic>> get events => controller.stream;
 }
 

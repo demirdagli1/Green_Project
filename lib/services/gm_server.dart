@@ -193,6 +193,8 @@ class GmServer {
               'deviceId': u.deviceId,
               'clanId': u.clanId,
               'clanName': u.clanName,
+              'bio': u.bio,
+              'photoPath': u.photoPath,
               'todaySteps': u.todaySteps,
               'streakDays': u.streakDays,
               'goldCoins': u.goldCoins,

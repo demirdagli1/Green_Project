@@ -4,7 +4,8 @@ import '../../core/constants/app_colors.dart';
 import '../../services/hub.dart';
 
 class QrNfcBikeModal extends StatefulWidget {
-  const QrNfcBikeModal({super.key});
+  final bool isTab;
+  const QrNfcBikeModal({super.key, this.isTab = false});
 
   @override
   State<QrNfcBikeModal> createState() => _QrNfcBikeModalState();
@@ -31,6 +32,20 @@ class _QrNfcBikeModalState extends State<QrNfcBikeModal> with SingleTickerProvid
 
   @override
   Widget build(BuildContext context) {
+    if (widget.isTab) {
+      return Scaffold(
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          title: const Text('Toplu Taşıma & Bisiklet', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18)),
+          bottom: TabBar(
+            controller: _tabs,
+            tabs: const [Tab(text: 'Otobüs QR / NFC'), Tab(text: 'Bisiklet Modu')],
+          ),
+        ),
+        body: TabBarView(controller: _tabs, children: [_transit(), _bike()]),
+      );
+    }
+
     final bottom = MediaQuery.of(context).viewInsets.bottom;
     return Padding(
       padding: EdgeInsets.only(bottom: bottom),
