@@ -1,0 +1,21 @@
+name: green_project
+description: "Yeşil Adım (EcoClan) - KTÜ Yeşil Gelecek Hackathonu"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.10.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: 2.5.5
+  uuid: 4.6.0
+  characters: 1.4.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
