@@ -236,6 +236,7 @@ void main() {
       // 'Tam Tabloyu Gör >' tıkla
       final viewAllBtn = find.text('Tam Tabloyu Gör >');
       expect(viewAllBtn, findsOneWidget);
+      await tester.ensureVisible(viewAllBtn);
       await tester.tap(viewAllBtn);
       await tester.pumpAndSettle();
 

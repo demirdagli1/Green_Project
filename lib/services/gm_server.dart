@@ -226,6 +226,7 @@ class GmServer {
         'settledWeeks': s.settledWeeks.toList(),
       },
       'telemetry': s.telemetry.toJson(),
+      'autoMotion': s.autoMotion.toJson(),
       'hardware': {
         'caps': sensors.caps,
         'perms': sensors.perms,

@@ -31,6 +31,9 @@ class SensorTelemetry {
   String lastValidationVerdict = 'Henüz doğrulama kararı yok';
   String windowStatus = 'Boşta (Sayaç bekleniyor)';
 
+  // Auto Motion (Aşama D)
+  Map<String, dynamic>? autoMotion;
+
   Map<String, dynamic> toJson() => {
         'steps': {
           'rawTotal': rawStepTotal,
@@ -64,5 +67,6 @@ class SensorTelemetry {
           'verdict': lastValidationVerdict,
           'windowStatus': windowStatus,
         },
+        if (autoMotion != null) 'autoMotion': autoMotion,
       };
 }

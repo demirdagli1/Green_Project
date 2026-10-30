@@ -9,6 +9,7 @@ import '../models/clan.dart';
 import '../models/shop_item.dart';
 import '../models/transit_stop.dart';
 import 'activity_validation_service.dart';
+import 'auto_motion_engine.dart';
 import 'sensor_telemetry.dart';
 import 'storage.dart';
 
@@ -36,6 +37,7 @@ class LogEntry {
 class BikeSession {
   final String tripId;
   final int startMs;
+  final bool isAuto;
   bool paused = false;
   double distanceM = 0;
   double maxKmh = 0;
@@ -46,7 +48,7 @@ class BikeSession {
   int lowAccuracy = 0;
   _Fix? last;
   final List<double> fastVariances = [];
-  BikeSession(this.tripId, this.startMs);
+  BikeSession(this.tripId, this.startMs, {this.isAuto = false});
   double get distanceKm => distanceM / 1000.0;
   double get avgKmh => movingMs > 0 ? (distanceM / (movingMs / 1000.0)) * 3.6 : 0;
 }
@@ -74,7 +76,9 @@ class AppStore extends ChangeNotifier {
   final ActivityValidationService rules = const ActivityValidationService();
 
   AppStore({required this.backend, DateTime Function()? clock, this.systemNotify})
-      : clock = clock ?? DateTime.now;
+      : clock = clock ?? DateTime.now {
+    autoMotion.addListener(notifyListeners);
+  }
 
   // ---- durum ----
   bool loaded = false;
@@ -96,6 +100,7 @@ class AppStore extends ChangeNotifier {
   List<LogEntry> log = [];
   int totalCarTaxiTripsAllTime = 0;
   final SensorTelemetry telemetry = SensorTelemetry();
+  late final AutoMotionEngine autoMotion = AutoMotionEngine(this);
 
   int pendingWindowSteps = 0;
   Timer? _stepWindowTimer;
@@ -355,6 +360,18 @@ class AppStore extends ChangeNotifier {
     final now = _nowMs;
     telemetry.rawStepTotal = total;
     telemetry.lastStepEventTs = now;
+    autoMotion.onSensorSteps(total);
+    telemetry.autoMotion = autoMotion.toJson();
+
+    if (autoMotion.isAutoSessionActive) {
+      // Bisiklet sürüşü esnasındaki pedal adımları yürüyüş ödülüne katılmayarak çift ödül önlenir
+      stepBaseline = total;
+      pendingWindowSteps = 0;
+      telemetry.pendingStepsWindow = 0;
+      telemetry.windowStatus = 'Bisiklet sürüşü aktif: Adım ödülü bastırıldı (çift ödül koruması)';
+      notifyListeners();
+      return const ActionResult(false, 'Bisiklet sürüşü aktif; adım bonusu bastırıldı.');
+    }
 
     if (stepBaseline == null || total < stepBaseline!) {
       stepBaseline = total;
@@ -403,6 +420,7 @@ class AppStore extends ChangeNotifier {
   // ---------- ivme / GPS ----------
   void onAccel({required double freqHz, required double variance, int sampleCount = 1}) {
     if (freqHz.isNaN || variance.isNaN || variance < 0) return;
+    autoMotion.onAccel(freqHz: freqHz, variance: variance);
     _shakeHz = freqHz;
     _shakeMs = _nowMs;
     telemetry.accelEventCount++;
@@ -410,6 +428,7 @@ class AppStore extends ChangeNotifier {
     telemetry.lastAccelFreqHz = freqHz;
     telemetry.lastAccelVariance = variance;
     telemetry.lastAccelEventTs = _nowMs;
+    telemetry.autoMotion = autoMotion.toJson();
     final b = bike;
     if (b != null && !b.paused && b.currentKmh > 25) b.fastVariances.add(variance);
     notifyListeners();
@@ -426,6 +445,15 @@ class AppStore extends ChangeNotifier {
     String? provider,
   }) {
     final ts = tsMs ?? _nowMs;
+    autoMotion.onLocation(
+      lat: lat,
+      lon: lon,
+      speedMps: speedMps,
+      accuracy: accuracy,
+      tsMs: ts,
+    );
+    telemetry.autoMotion = autoMotion.toJson();
+
     if (lat.isNaN || lon.isNaN || accuracy == null || accuracy.isNaN || accuracy > 30) {
       bike?.lowAccuracy++;
       telemetry.gpsStatus = 'Düşük hassasiyet (>30m) veya geçersiz konum';

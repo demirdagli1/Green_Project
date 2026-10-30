@@ -6,6 +6,7 @@ import '../../models/app_user.dart';
 import '../../models/clan.dart';
 import '../../models/league_tier.dart';
 import '../../services/app_store.dart';
+import '../../services/auto_motion_engine.dart';
 import '../../services/hub.dart';
 
 class HomeScreen extends StatelessWidget {
@@ -80,6 +81,9 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 16),
                   _stepsCard(steps, remaining),
                   const SizedBox(height: 12),
+                  // Otomatik Hareket Durum Kartı (Aşama D)
+                  _autoMotionCard(store),
+                  const SizedBox(height: 12),
                   // Birleşik Lig + Sıra Kartları (Klan ve Birey tek kartlarda)
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -118,6 +122,157 @@ class HomeScreen extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _autoMotionCard(AppStore store) {
+    final auto = store.autoMotion;
+    final isCycling = auto.isAutoSessionActive;
+    final isPotential = auto.mode == AutoMotionMode.potentialBike;
+
+    if (!isCycling && !isPotential && auto.mode != AutoMotionMode.walking) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.sensors, size: 16, color: AppColors.primaryPurple),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Hareket Modu: ${auto.statusExplanation}',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (isCycling) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFEDE9FE), Color(0xFFDCFCE7)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.primaryPurple, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: const BoxDecoration(color: AppColors.primaryPurple, shape: BoxShape.circle),
+                  child: const Icon(Icons.directions_bike, color: Colors.white, size: 20),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '🚴 Otomatik Bisiklet Sürüşü Algılandı',
+                        style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.textDark),
+                      ),
+                      Text(
+                        auto.statusExplanation,
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF047857)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _miniMetric('Mesafe', '${(auto.tripDistanceM / 1000).toStringAsFixed(2)} km'),
+                _miniMetric('Hız', '${auto.currentSpeedKmh.toStringAsFixed(1)} km/sa'),
+                _miniMetric('Maks Hız', '${auto.maxSpeedKmh.toStringAsFixed(1)} km/sa'),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.emeraldGreen,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    icon: const Icon(Icons.check, size: 16),
+                    label: const Text('Bitir & Kaydet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
+                    onPressed: () => auto.finishAutoTrip(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.fireRed,
+                    side: const BorderSide(color: AppColors.fireRed),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: () => auto.cancelAutoTrip(),
+                  child: const Text('İptal', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: isPotential ? const Color(0xFFFEF3C7) : const Color(0xFFF0FDF4),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isPotential ? const Color(0xFFF59E0B) : const Color(0xFF86EFAC)),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isPotential ? Icons.hourglass_top : Icons.directions_walk,
+            size: 18,
+            color: isPotential ? const Color(0xFFD97706) : const Color(0xFF16A34A),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              auto.statusExplanation,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: isPotential ? const Color(0xFFB45309) : const Color(0xFF15803D),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniMetric(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.textDark)),
+        Text(label, style: const TextStyle(fontSize: 10, color: AppColors.textMuted)),
+      ],
     );
   }
 

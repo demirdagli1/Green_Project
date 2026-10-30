@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'app_store.dart';
+import 'auto_motion_engine.dart';
 
 class CommandResult {
   final bool ok;
@@ -244,6 +245,41 @@ class CommandDispatcher {
         if (store.me == null) return const CommandResult(ok: false, message: 'Profil yok.');
         final r = store.updateBio(bio);
         return CommandResult(ok: r.ok, message: r.message, data: {'bio': store.me?.bio});
+
+      case 'auto_motion_simulate':
+        final rawSpeed = p['speedKmh'];
+        final rawDur = p['durationSeconds'];
+        final rawSteps = p['stepDelta'];
+        final rawVar = p['variance'];
+        final rawAcc = p['accuracy'];
+
+        final speed = (rawSpeed as num?)?.toDouble() ?? 18.0;
+        final dur = (rawDur as num?)?.toInt() ?? 30;
+        final steps = (rawSteps as num?)?.toInt() ?? 0;
+        final variance = (rawVar as num?)?.toDouble() ?? 0.18;
+        final accuracy = (rawAcc as num?)?.toDouble() ?? 10.0;
+
+        store.autoMotion.simulateMotionFlow(
+          targetMode: AutoMotionMode.cycling,
+          speedKmh: speed,
+          durationSeconds: dur,
+          stepDelta: steps,
+          variance: variance,
+          accuracy: accuracy,
+        );
+        return CommandResult(
+          ok: true,
+          message: 'Otomatik hareket simülasyonu çalıştırıldı ($dur sn, $speed km/sa).',
+          data: store.autoMotion.toJson(),
+        );
+
+      case 'auto_motion_finish':
+        final r = store.autoMotion.finishAutoTrip();
+        return CommandResult(ok: r.ok, message: r.message, data: store.autoMotion.toJson());
+
+      case 'auto_motion_cancel':
+        final r = store.autoMotion.cancelAutoTrip();
+        return CommandResult(ok: r.ok, message: r.message, data: store.autoMotion.toJson());
 
       default:
         return CommandResult(ok: false, message: 'Bilinmeyen komut: $cmd');
