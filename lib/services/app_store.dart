@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -8,6 +9,7 @@ import '../models/clan.dart';
 import '../models/shop_item.dart';
 import '../models/transit_stop.dart';
 import 'activity_validation_service.dart';
+import 'sensor_telemetry.dart';
 import 'storage.dart';
 
 /// Eylem sonucu. [ok] false ise durum/puan değişmemiştir.
@@ -93,6 +95,11 @@ class AppStore extends ChangeNotifier {
   final Set<String> settledWeeks = {};
   List<LogEntry> log = [];
   int totalCarTaxiTripsAllTime = 0;
+  final SensorTelemetry telemetry = SensorTelemetry();
+
+  int pendingWindowSteps = 0;
+  Timer? _stepWindowTimer;
+  int? _windowStartMs;
 
   // geçici (kalıcı olmayan) sensör durumu
   BikeSession? bike;
@@ -151,6 +158,10 @@ class AppStore extends ChangeNotifier {
 
   /// Bekleyen yazmaların bitmesini bekler (test/kapanış).
   Future<void> flush() => _persistChain;
+
+  void commitDirect() {
+    _commit();
+  }
 
   Map<String, dynamic> _encode() => {
         'me': me?.toJson(),
@@ -294,35 +305,92 @@ class AppStore extends ChangeNotifier {
     return ActionResult(true, pts > 0 ? '+$pts puan' : 'Adım eklendi', points: pts);
   }
 
+  ActionResult flushPendingStepsWindow() {
+    _stepWindowTimer?.cancel();
+    _stepWindowTimer = null;
+    if (me == null || pendingWindowSteps <= 0) {
+      telemetry.windowStatus = 'Boşta / bekleyen adım yok';
+      return const ActionResult(false, 'Bekleyen adım yok.');
+    }
+    final now = _nowMs;
+    final start = _windowStartMs ?? stepBaselineMs;
+    final elapsedMs = now - start;
+    final minutes = elapsedMs > 0 ? elapsedMs / 60000.0 : 0.5;
+
+    final verdict = rules.checkSteps(
+      deltaSteps: pendingWindowSteps,
+      minutes: minutes,
+      shakeHz: _freshShake(),
+      gpsMovementMeters: gpsPathMeters(),
+    );
+
+    final stepsToCommit = pendingWindowSteps;
+    final currentTotal = (stepBaseline ?? 0) + pendingWindowSteps;
+    stepBaseline = currentTotal;
+    stepBaselineMs = now;
+    _windowStartMs = now;
+    pendingWindowSteps = 0;
+    telemetry.pendingStepsWindow = 0;
+    telemetry.stepBaseline = stepBaseline;
+    telemetry.lastValidationTs = now;
+    telemetry.lastValidationOk = verdict.ok;
+    telemetry.lastValidationVerdict = verdict.ok ? 'Onaylandı (+${stepsToCommit ~/ 1000 * 5} P)' : verdict.message;
+
+    if (!verdict.ok) {
+      telemetry.windowStatus = 'Reddedildi: ${verdict.message}';
+      _note('⚠️ Adım reddedildi', verdict.message);
+      _commit();
+      return ActionResult(false, verdict.message);
+    }
+
+    telemetry.windowStatus = 'Doğrulandı ($stepsToCommit adım eklendi)';
+    telemetry.verifiedStepsToday = (me?.todaySteps ?? 0) + stepsToCommit;
+    return _creditSteps(stepsToCommit, demo: false);
+  }
+
   /// GERÇEK sensör (TYPE_STEP_COUNTER toplamı). Cihaz yeniden başlatma (azalma) puan üretmez.
   ActionResult onSensorSteps(int total) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     _sync();
     final now = _nowMs;
+    telemetry.rawStepTotal = total;
+    telemetry.lastStepEventTs = now;
+
     if (stepBaseline == null || total < stepBaseline!) {
       stepBaseline = total;
       stepBaselineMs = now;
+      _windowStartMs = now;
+      pendingWindowSteps = 0;
+      telemetry.stepBaseline = total;
+      telemetry.rawStepDelta = 0;
+      telemetry.pendingStepsWindow = 0;
+      telemetry.windowStatus = 'Sayaç (yeniden) başlatıldı; ilk taban çizgi kaydedildi.';
       _commit();
       return const ActionResult(false, 'Sayaç (yeniden) başlatıldı; puan yok.');
     }
     final delta = total - stepBaseline!;
+    telemetry.stepBaseline = stepBaseline;
+    telemetry.rawStepDelta = delta;
+
     if (delta == 0) return const ActionResult(false, 'Tekrarlanan olay.', duplicate: true);
-    final elapsedMs = now - stepBaselineMs;
-    if (elapsedMs < 30000) return const ActionResult(false, 'Pencere dolmadı.');
-    final verdict = rules.checkSteps(
-      deltaSteps: delta,
-      minutes: elapsedMs / 60000.0,
-      shakeHz: _freshShake(),
-      gpsMovementMeters: gpsPathMeters(),
-    );
-    stepBaseline = total;
-    stepBaselineMs = now;
-    if (!verdict.ok) {
-      _note('⚠️ Adım reddedildi', verdict.message);
-      _commit();
-      return ActionResult(false, verdict.message);
+
+    _windowStartMs ??= stepBaselineMs;
+    final elapsedMs = now - _windowStartMs!;
+    pendingWindowSteps = delta;
+    telemetry.pendingStepsWindow = pendingWindowSteps;
+
+    if (elapsedMs < 30000) {
+      telemetry.windowStatus = 'Pencere doluyor ($pendingWindowSteps adım bekliyor, ${(30 - elapsedMs ~/ 1000)} sn)';
+      _stepWindowTimer?.cancel();
+      final remainingMs = 30000 - elapsedMs;
+      _stepWindowTimer = Timer(Duration(milliseconds: remainingMs + 100), () {
+        flushPendingStepsWindow();
+      });
+      notifyListeners();
+      return const ActionResult(false, 'Pencere dolmadı.');
     }
-    return _creditSteps(delta, demo: false);
+
+    return flushPendingStepsWindow();
   }
 
   /// DEMO: sensör değil, jüri simülasyonu.
@@ -333,22 +401,45 @@ class AppStore extends ChangeNotifier {
   }
 
   // ---------- ivme / GPS ----------
-  void onAccel({required double freqHz, required double variance}) {
+  void onAccel({required double freqHz, required double variance, int sampleCount = 1}) {
     if (freqHz.isNaN || variance.isNaN || variance < 0) return;
     _shakeHz = freqHz;
     _shakeMs = _nowMs;
+    telemetry.accelEventCount++;
+    telemetry.accelSampleCount += sampleCount;
+    telemetry.lastAccelFreqHz = freqHz;
+    telemetry.lastAccelVariance = variance;
+    telemetry.lastAccelEventTs = _nowMs;
     final b = bike;
     if (b != null && !b.paused && b.currentKmh > 25) b.fastVariances.add(variance);
+    notifyListeners();
   }
 
   double? _freshShake() => (_nowMs - _shakeMs) <= 20000 ? _shakeHz : null;
 
-  void onLocation({required double lat, required double lon, double? speedMps, double? accuracy, int? tsMs}) {
+  void onLocation({
+    required double lat,
+    required double lon,
+    double? speedMps,
+    double? accuracy,
+    int? tsMs,
+    String? provider,
+  }) {
+    final ts = tsMs ?? _nowMs;
     if (lat.isNaN || lon.isNaN || accuracy == null || accuracy.isNaN || accuracy > 30) {
       bike?.lowAccuracy++;
+      telemetry.gpsStatus = 'Düşük hassasiyet (>30m) veya geçersiz konum';
+      notifyListeners();
       return;
     }
-    final ts = tsMs ?? _nowMs;
+    telemetry.lastLat = lat;
+    telemetry.lastLon = lon;
+    telemetry.lastAccuracy = accuracy;
+    telemetry.lastSpeedKmh = (speedMps != null && speedMps >= 0) ? speedMps * 3.6 : null;
+    telemetry.lastGpsFixTs = ts;
+    telemetry.gpsProvider = provider;
+    telemetry.gpsStatus = 'Fix alındı (${accuracy.toStringAsFixed(1)} m)';
+
     final fix = _Fix(lat, lon, ts, accuracy);
     _fixes.add(fix);
     _fixes.removeWhere((f) => ts - f.ts > 60000);
@@ -523,15 +614,17 @@ class AppStore extends ChangeNotifier {
     double? distanceKm,
     int? stepDelta,
     required bool demo,
+    bool ignoreTransitExemption = false,
   }) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     _sync();
     if (_seen(tripId)) return const ActionResult(false, 'Bu yolculuk zaten işlendi.', duplicate: true);
+    final hasTransit = !ignoreTransitExemption && transitInLast45Min;
     final v = rules.checkVehicle(
       avgSpeedKmh: avgSpeedKmh,
       distanceKm: distanceKm,
       stepDelta: stepDelta,
-      transitInLast45Min: transitInLast45Min,
+      transitInLast45Min: hasTransit,
     );
     if (!v.detected) return ActionResult(false, v.message);
     _mark(tripId);

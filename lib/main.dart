@@ -6,6 +6,8 @@ import 'core/constants/app_colors.dart';
 import 'screens/main_shell.dart';
 import 'screens/onboarding/welcome_screen.dart';
 import 'services/app_store.dart';
+import 'services/command_dispatcher.dart';
+import 'services/gm_server.dart';
 import 'services/hardware_bridge.dart';
 import 'services/hub.dart';
 import 'services/sensor_controller.dart';
@@ -20,8 +22,31 @@ Future<void> main() async {
   );
   await store.load();
   AppStore.instance = store;
-  Hub.sensors = SensorController(bridge: bridge, store: store);
+  final sensors = SensorController(bridge: bridge, store: store);
+  Hub.sensors = sensors;
+  final dispatcher = CommandDispatcher(store);
+  Hub.dispatcher = dispatcher;
+  final gmServer = GmServer(dispatcher: dispatcher, sensors: sensors);
+  Hub.gmServer = gmServer;
+
+  final token = await loadOrCreateGmToken();
+  await gmServer.start(initialToken: token);
+
   runApp(const GreenProjectApp());
+}
+
+Future<String> loadOrCreateGmToken() async {
+  try {
+    final p = await SharedPreferences.getInstance();
+    var t = p.getString('gm_token');
+    if (t == null || t.isEmpty) {
+      t = 'gm_${const Uuid().v4().replaceAll('-', '').substring(0, 16)}';
+      await p.setString('gm_token', t);
+    }
+    return t;
+  } catch (_) {
+    return 'gm_${const Uuid().v4().replaceAll('-', '').substring(0, 16)}';
+  }
 }
 
 /// Cihaza özgü kimlik (güvenli sunucu kimliği DEĞİLDİR).

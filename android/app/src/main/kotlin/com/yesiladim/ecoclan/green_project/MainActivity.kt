@@ -84,6 +84,18 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
                 )
                 result.success(ok)
             }
+            "openAppSettings" -> {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = android.net.Uri.fromParts("package", packageName, null)
+                        flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+                    }
+                    startActivity(intent)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
             else -> result.notImplemented()
         }
     }
@@ -152,21 +164,50 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
     private fun startSensors(): Map<String, Any> {
         val started = HashMap<String, Any>()
         if (sensorsOn) stopSensors()
+
         val step = sensorManager.getDefaultSensor(Sensor.TYPE_STEP_COUNTER)
-        started["stepCounter"] = if (step != null && granted("activity")) {
-            sensorManager.registerListener(this, step, SensorManager.SENSOR_DELAY_NORMAL); true
+        val stepOk = if (step != null && granted("activity")) {
+            sensorManager.registerListener(this, step, SensorManager.SENSOR_DELAY_NORMAL)
         } else false
+        started["stepCounter"] = stepOk
+
         val acc = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
-        started["accelerometer"] = if (acc != null) {
-            sensorManager.registerListener(this, acc, SensorManager.SENSOR_DELAY_GAME); true
+        val accOk = if (acc != null) {
+            sensorManager.registerListener(this, acc, SensorManager.SENSOR_DELAY_UI)
         } else false
+        started["accelerometer"] = accOk
+
         val lm = getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        started["gps"] = if (granted("location") && lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+        var gpsOk = false
+        var gpsMode = "none"
+        if (granted("location")) {
             try {
-                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this, Looper.getMainLooper()); true
-            } catch (e: SecurityException) { false }
-        } else false
+                if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 0f, this, Looper.getMainLooper())
+                    gpsOk = true
+                    gpsMode = "gps"
+                }
+                if (lm.isProviderEnabled(LocationManager.NETWORK_PROVIDER)) {
+                    lm.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 0f, this, Looper.getMainLooper())
+                    gpsOk = true
+                    gpsMode = if (gpsMode == "gps") "gps+network" else "network"
+                }
+            } catch (_: SecurityException) {
+                gpsOk = false
+            }
+        }
+        started["gps"] = gpsOk
+        started["gpsMode"] = gpsMode
         sensorsOn = true
+
+        emit(mapOf(
+            "type" to "sensor_started",
+            "stepCounter" to stepOk,
+            "accelerometer" to accOk,
+            "gps" to gpsOk,
+            "gpsMode" to gpsMode,
+            "ts" to System.currentTimeMillis()
+        ))
         return started
     }
 
@@ -179,23 +220,39 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
 
     override fun onSensorChanged(e: SensorEvent) {
         when (e.sensor.type) {
-            Sensor.TYPE_STEP_COUNTER ->
-                emit(mapOf("type" to "steps", "total" to e.values[0].toLong(), "ts" to System.currentTimeMillis()))
+            Sensor.TYPE_STEP_COUNTER -> {
+                val total = e.values[0].toLong()
+                emit(mapOf(
+                    "type" to "steps",
+                    "total" to total,
+                    "ts" to System.currentTimeMillis()
+                ))
+            }
             Sensor.TYPE_ACCELEROMETER -> {
                 val mag = sqrt((e.values[0] * e.values[0] + e.values[1] * e.values[1] + e.values[2] * e.values[2]).toDouble())
-                val nowMs = e.timestamp / 1_000_000L
+                val nowMs = System.currentTimeMillis()
                 accelWindow.add(Pair(nowMs, mag))
-                while (accelWindow.isNotEmpty() && nowMs - accelWindow.first().first > 2000) accelWindow.removeAt(0)
-                if (accelWindow.size >= 40 && accelWindow.last().first - accelWindow.first().first >= 1900) {
+                while (accelWindow.isNotEmpty() && nowMs - accelWindow.first().first > 2000) {
+                    accelWindow.removeAt(0)
+                }
+                val span = if (accelWindow.isNotEmpty()) (accelWindow.last().first - accelWindow.first().first) else 0L
+                if (accelWindow.size >= 15 && span >= 1000L) {
                     val vals = accelWindow.map { it.second }
                     val mean = vals.average()
                     val variance = vals.map { (it - mean) * (it - mean) }.average()
                     var crossings = 0
-                    for (i in 1 until vals.size) if ((vals[i - 1] - mean) * (vals[i] - mean) < 0) crossings++
-                    val spanSec = (accelWindow.last().first - accelWindow.first().first) / 1000.0
-                    val freq = crossings / 2.0 / spanSec
-                    emit(mapOf("type" to "accel", "variance" to variance, "freqHz" to freq,
-                        "ts" to System.currentTimeMillis()))
+                    for (i in 1 until vals.size) {
+                        if ((vals[i - 1] - mean) * (vals[i] - mean) < 0) crossings++
+                    }
+                    val spanSec = span / 1000.0
+                    val freq = if (spanSec > 0) crossings / 2.0 / spanSec else 0.0
+                    emit(mapOf(
+                        "type" to "accel",
+                        "variance" to variance,
+                        "freqHz" to freq,
+                        "sampleCount" to accelWindow.size,
+                        "ts" to System.currentTimeMillis()
+                    ))
                     accelWindow.clear()
                 }
             }
@@ -206,17 +263,24 @@ class MainActivity : FlutterActivity(), SensorEventListener, LocationListener,
 
     override fun onLocationChanged(l: Location) {
         emit(mapOf(
-            "type" to "location", "lat" to l.latitude, "lon" to l.longitude,
+            "type" to "location",
+            "lat" to l.latitude,
+            "lon" to l.longitude,
             "speedMps" to (if (l.hasSpeed()) l.speed.toDouble() else null),
             "accuracy" to (if (l.hasAccuracy()) l.accuracy.toDouble() else null),
+            "provider" to l.provider,
             "ts" to l.time
         ))
     }
 
     @Deprecated("Deprecated in Java")
     override fun onStatusChanged(p: String?, s: Int, b: Bundle?) {}
-    override fun onProviderEnabled(p: String) {}
-    override fun onProviderDisabled(p: String) { emit(mapOf("type" to "gpsDisabled", "ts" to System.currentTimeMillis())) }
+    override fun onProviderEnabled(p: String) {
+        emit(mapOf("type" to "gpsEnabled", "provider" to p, "ts" to System.currentTimeMillis()))
+    }
+    override fun onProviderDisabled(p: String) {
+        emit(mapOf("type" to "gpsDisabled", "provider" to p, "ts" to System.currentTimeMillis()))
+    }
 
     // ---- NFC ----
     private fun startNfc(): Boolean {

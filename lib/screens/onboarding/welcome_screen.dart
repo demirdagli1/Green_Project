@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../services/hub.dart';
@@ -31,12 +32,27 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       return;
     }
     setState(() => _busy = true);
+
+    try {
+      final p = await SharedPreferences.getInstance();
+      final alreadyAsked = p.getBool('perm_asked_once') ?? false;
+      if (!alreadyAsked) {
+        // İlk açılışta izinleri bir kez iste (kabul zorunlu değil)
+        await Hub.sensors.requestAll();
+        await p.setBool('perm_asked_once', true);
+      }
+    } catch (_) {}
+
     final id = await widget.deviceIdProvider();
     final r = Hub.store.register(deviceId: id, name: _name.text, clanName: clan);
-    if (!r.ok && mounted) setState(() {
-      _error = r.message;
-      _busy = false;
-    });
+    if (!r.ok && mounted) {
+      setState(() {
+        _error = r.message;
+        _busy = false;
+      });
+    } else if (r.ok) {
+      await Hub.sensors.start();
+    }
   }
 
   @override
@@ -55,9 +71,11 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
               const Text('Hoş Geldin!\nİsmin ne?',
                   style: TextStyle(fontSize: 30, fontWeight: FontWeight.w900, color: AppColors.textDark)),
               const SizedBox(height: 8),
-              const Text('Üyelik yok: bu cihazda yerel bir profil oluşturulur.',
-                  style: TextStyle(color: AppColors.textMuted)),
-              const SizedBox(height: 24),
+              const Text(
+                'Üyelik yok: bu cihazda yerel bir profil oluşturulur. Adım, konum ve bildirim izinleri ilk açılışta istenir (kabul zorunlu değildir).',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 16),
               TextField(
                 controller: _name,
                 maxLength: 24,
@@ -90,7 +108,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
                   padding: const EdgeInsets.only(top: 12),
                   child: Text(_error!, style: const TextStyle(color: AppColors.fireRed, fontWeight: FontWeight.w700)),
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(

@@ -5,24 +5,24 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
 ## 🚀 Proje Durumu ve Özet
 
 - **Statik Kod Analizi:** `dart analyze` ile 0 hata, 0 uyarı
-- **Test Kapsamı:** 58 / 58 test başarılı (`rules_test`, `store_test`, `ui_flow_test`)
-- **Derleme Modu:** Tamamen çevrimdışı (offline Gradle 9.3.1, JDK 17, AGP)
-- **Fiziksel Cihaz Doğrulaması:** Samsung SM-A346E (Android 16 / API 36) üzerinde kurulum, donanım köprüsü yetenek/izin sorgusu ve sistem bildirimi doğrulandı (fiziksel yürüyüş ve fiziksel NFC etiketi okutma kullanıcı testine tabidir).
+- **Test Kapsamı:** **71 / 71 test başarılı** (`rules_test`, `store_test`, `ui_flow_test`, `gm_panel_test`)
+- **Derleme Modu:** Tamamen çevrimdışı (offline Gradle, JDK 17, AGP, `--no-daemon --max-workers=1`)
+- **Fiziksel Cihaz Doğrulaması:** Samsung SM-A346E (Android 16 / API 36) üzerinde kurulum, canlı telemetri/sensör dinleyicileri, izin akışı ve yerel PC GM Paneli USB loopback testi doğrulandı.
 - **Ekran Uyum Testi:** 320x568 küçük ekran + %160 metin boyutu altında taşmasız dinamik yerleşim.
 
 ---
 
 ## 📱 Temel Modüller ve Özellikler
 
-1. **Onboarding & Klan Seçimi:**
-   - Kullanıcı adı ve üniversite / mahalle klanı seçimi ile hızlı başlangıç.
-   - Yerel kalıcı profil (`SharedPreferences`).
+1. **Onboarding & İzin Akışı:**
+   - İlk açılışta toplu izin talebi (`welcome_screen.dart`), tekrar eden sistem uyarıları olmaksızın hızlı başlangıç.
+   - Ana sayfada kalabalık yaratan teknik sensör kartı kaldırılmış, Profil sayfasının altına taşınmıştır.
 
-2. **Ana Sayfa & Aktivite Takibi:**
+2. **Aktivite Takibi ve Sensör Telemetrisi:**
    - Adım sayacı ve 1000 adımda bir +5 puan mekanizması.
-   - Kadans (>185 adım/dk) ve GPS sallama hilesi koruması.
-   - Bireysel lig kademeleri (`Karbonmonoksit`, `Karbondioksit`, `Azot`, `Oksijen`, `Ozon`, `Sönmez Biyosfer`) ve klan lig kademeleri.
-   - Önlenen CO₂ salımı (kg) ve demo ağaç eşdeğeri göstergesi.
+   - Kısa yürüyüşlerde adım kaybını önleyen 30 saniyelik zaman aşımı penceresi.
+   - Kadans (>185 adım/dk) ve GPS hareketsizlik/sallama hilesi koruması.
+   - Ham telemetri takibi (donanım sayacı, baseline, varyans, GPS fix/doğruluk).
 
 3. **Toplu Taşıma (QR & NFC):**
    - Tek biniş için +3 puan ve sabit CO₂ tasarrufu.
@@ -30,32 +30,44 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
    - Manuel payload girişi ve simülasyon desteği.
 
 4. **Bisiklet ve Araç/Taksi Denetimi:**
-   - Bisiklet sürüşlerinde mesafe bazlı puanlama ve >25 km/sa hızda ivmeölçer varyans eşiği (`0.12`).
-   - Araç/taksi kullanımında (>30 km/sa) son 45 dk transit binişi yoksa harcanan CO₂ hesabı ve Utanç Tablosu kaydı.
+   - Bisiklet sürüşlerinde mesafe bazlı puanlama ve >25 km/sa hızda ivmeölçer varyans eşiği (`0.12`). Net ceza ve ret açıklamaları.
+   - Araç/taksi kullanımında (>30 km/sa) son 45 dk transit binişi yoksa harcanan CO₂ hesabı ve Utanç Tablosu kaydı; deterministik test seçeneği.
 
 5. **Liderlik ve Utanç Tablosu:**
    - **Gurur Tablosu:** Bireysel ve klan bazlı haftalık/tüm zamanlar sıralamaları, hibrit normalize klan puanı hesabı (`0.6 × ToplamPuan + 0.4 × 50 × ÜyeOrtalaması`).
    - **Utanç Tablosu:** Harcanan CO₂ miktarına göre sıralama ve isim maskeleme (`Pel***`; yalnızca görsel gizleme sağlar, hukuki uyumluluk garantisi değildir).
 
 6. **Kozmetik Mağazası & Envanter:**
-   - Haftalık puanların altına dönüştürülmesiyle avatar, çerçeve ve evcil hayvan satın alma ve kuşanma.
-
-7. **Jüri & Admin Paneli:**
-   - Hafta atlatma simülasyonu, puanların altına dönüştürülmesi, sensör testleri ve durum denetimi.
+   - Puanların altına dönüştürülmesiyle avatar, çerçeve ve evcil hayvan satın alma ve kuşanma.
 
 ---
 
-## 🛠️ Gerçek / Demo / Eksik Özellik Ayrımı
+## 🛠️ Yerel PC GM Kontrol Paneli (USB / ADB)
 
-- **Gerçek:** Yerel kalıcılık, tüm puanlama ve hile algoritmaları, lig hesapları, cooldown takibi, mağaza envanteri, duyarlı arayüz yerleşimi, Android donanım köprüsü (yetenek/izin sorgusu, ön plan sensör dinleme, sistem bildirimi).
-- **Demo:** Canlı backend olmadığı için rakip kullanıcılar ve rakip klan verileri tohum simülasyonudur.
-- **Eksik / Sınırlar:** Canlı Supabase bağlantısı ve cihazlar arası Realtime senkronizasyonu doğrulanmadı (istemcide `service_role` kullanılmaz; E-posta/SMS/OTP zaten kapsam dışıdır). Fiziksel kamera QR paketi yerel önbellekte bulunmadığından manuel kod girişi kullanılır.
+Harici web hosting gerektirmeyen, Android cihaz içinde yerel loopback (`127.0.0.1:8088`) üzerinden çalışan karanlık tema AppStore GM kontrol paneli:
 
-Detaylı doğrulama kayıtları ve ekran görüntüleri için [DURUM.md](DURUM.md) ve `evidence/` dizinine bakabilirsiniz.
+1. **Port Yönlendirme:**
+   ```bash
+   adb forward tcp:8088 tcp:8088
+   ```
+
+2. **Erişim:**
+   Uygulama içi Admin Panelinde gösterilen güvenlik tokenı ile tarayıcıdan açınız:
+   ```
+   http://127.0.0.1:8088/?token=<GM_TOKEN>
+   ```
+
+3. **Güvenlik Mimarisi:**
+   - Release modunda otomatik olarak devre dışı bırakılır (`kReleaseMode`).
+   - 401 yanıtlarında token bilgisi ifşa edilmez.
+   - Sıkı Origin kontrolü (`localhost` / `127.0.0.1:8088`), phishing domain koruması.
+   - 64 KB streaming gövde sınırlaması.
+   - Komutlarda idempotent duplicate önleme ve çakışma (conflict) tespiti.
+   - Katı sayısal sınır kontrolleri (adım, streak, altın).
 
 ---
 
-## 📦 Derleme ve Çalıştırma
+## 📦 Derleme ve Test
 
 ```bash
 # Testleri çalıştırma:

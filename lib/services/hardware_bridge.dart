@@ -13,6 +13,7 @@ abstract class HardwareBridge {
   Future<bool> startNfc();
   Future<void> stopNfc();
   Future<bool> showNotification(String title, String body);
+  Future<bool> openAppSettings();
   Stream<Map<String, dynamic>> get events;
 }
 
@@ -120,6 +121,17 @@ class AndroidHardwareBridge implements HardwareBridge {
   }
 
   @override
+  Future<bool> openAppSettings() async {
+    try {
+      return (await _m.invokeMethod<bool>('openAppSettings')) ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  @override
   Stream<Map<String, dynamic>> get events =>
       _e.receiveBroadcastStream().map((o) => _map(o)).handleError((Object _) {});
 }
@@ -145,6 +157,8 @@ class NoHardwareBridge implements HardwareBridge {
   Future<void> stopNfc() async {}
   @override
   Future<bool> showNotification(String title, String body) async => false;
+  @override
+  Future<bool> openAppSettings() async => false;
   @override
   Stream<Map<String, dynamic>> get events => controller.stream;
 }

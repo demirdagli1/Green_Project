@@ -75,12 +75,12 @@ class ActivityValidationService {
     }
     if (maxSpeedKmh >= 50.0 || avgSpeedKmh >= 35.0) {
       return const BikeVerdict(BikeStatus.rejectedSpeedSpoof, 0, 0, 0,
-          'Saatte 50 km giden bisiklet olmaz! Aktivite reddedildi.');
+          '❌ Hız reddi: Saatte 50 km giden bisiklet olmaz! Aktivite reddedildi (puan verilmedi, Utanç Tablosu cezası uygulanmadı).');
     }
     if (avgSpeedKmh > 25.0 && fastAccelVariance != null && fastAccelVariance < 0.12) {
       final wasted = distanceKm * 0.192;
       return BikeVerdict(BikeStatus.carTaxiPenalty, 0, 0, wasted,
-          'İvme sensörü titreşimsiz (araba benzeri) ölçüldü; kesin kanıt değildir. Ceza yazıldı.');
+          '🚨 Araba şüphesi (titreşimsiz ivme: varyans ${fastAccelVariance.toStringAsFixed(3)} < 0.12): Aktivite puanı verilmedi. Haftalık araba/taksi sayacına +1 eklendi ve ${wasted.toStringAsFixed(2)} kg harcanan CO₂ Utanç Tablosu siciline işlendi (altın/puan kesintisi yapılmaz).');
     }
     final pts = distanceKm.floor();
     return BikeVerdict(BikeStatus.accepted, pts, distanceKm * 0.19, 0,
@@ -103,12 +103,16 @@ class ActivityValidationService {
     if (avgSpeedKmh.isNaN || distanceKm.isNaN || avgSpeedKmh < 0 || distanceKm <= 0) {
       return const VehicleVerdict(false, 0, 'Geçersiz ölçüm; suçlama yapılmadı.');
     }
-    if (avgSpeedKmh > 30.0 && stepDelta <= vehicleMaxStepDelta && !transitInLast45Min) {
+    if (transitInLast45Min) {
+      return const VehicleVerdict(false, 0,
+          'Son 45 dk içinde toplu taşıma kaydın olduğu için araba/taksi muafiyeti devrede; ceza uygulanmadı.');
+    }
+    if (avgSpeedKmh > 30.0 && stepDelta <= vehicleMaxStepDelta) {
       final w = distanceKm * 0.192;
       return VehicleVerdict(true, w,
-          '🚕 Yakalandın! Son aktiviteyi araba/taksi yerine toplu taşımayla gitseydin ${w.toStringAsFixed(2)} kg CO₂ tasarruf yapardın aslında!!! Utanç tablosuna yazıldın!');
+          '🚕 Yakalandın! Hız: ${avgSpeedKmh.toStringAsFixed(0)} km/sa, mesafe: ${distanceKm.toStringAsFixed(1)} km. Son aktiviteyi araba/taksi yerine toplu taşımayla gitseydin ${w.toStringAsFixed(2)} kg CO₂ tasarruf yapardın aslında!!! Utanç tablosuna yazıldın!');
     }
-    return const VehicleVerdict(false, 0, 'Araba/taksi koşulları sağlanmadı.');
+    return const VehicleVerdict(false, 0, 'Araba/taksi koşulları sağlanmadı (Hız ≤ 30 km/sa veya adım artışı > 10).');
   }
 
   /// Haversine, metre.

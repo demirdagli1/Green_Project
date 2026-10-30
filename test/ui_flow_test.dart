@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:green_project/main.dart';
+import 'package:green_project/screens/shop_profile/shop_profile_screen.dart';
 import 'package:green_project/services/app_store.dart';
 import 'package:green_project/services/hardware_bridge.dart';
 import 'package:green_project/services/hub.dart';
@@ -32,6 +33,8 @@ class _DelayedHardwareBridge implements HardwareBridge {
   Future<void> stopNfc() async {}
   @override
   Future<bool> showNotification(String title, String body) async => true;
+  @override
+  Future<bool> openAppSettings() async => true;
   @override
   Stream<Map<String, dynamic>> get events => controller.stream;
 }
@@ -173,7 +176,7 @@ void main() {
     expect(t.takeException(), isNull);
   });
 
-  testWidgets('regresyon: asenkron donanım köprüsü yanıtı sonrası HomeScreen sensör kartı güncellenir', (t) async {
+  testWidgets('regresyon: asenkron donanım köprüsü yanıtı sonrası profil sensör kartı güncellenir', (t) async {
     SharedPreferences.setMockInitialValues({});
     final store = AppStore(backend: MemoryStore(), clock: () => DateTime.utc(2026, 10, 26, 9));
     await store.load();
@@ -182,9 +185,13 @@ void main() {
     final bridge = _DelayedHardwareBridge();
     Hub.sensors = SensorController(bridge: bridge, store: store);
 
-    // İlk karede henüz donanım yanıtı yokken kapalı/bilinmiyor görünür
+    // Profil sekmesine git: donanım yanıtı yokken kapalı/bilinmiyor görünür
     await t.pumpWidget(const GreenProjectApp());
-    await t.pump();
+    await t.pumpAndSettle();
+    await t.tap(find.byTooltip('Mağaza ve profil'));
+    await t.pumpAndSettle();
+    final cardFinder = find.byType(SensorStatusCard);
+    await t.scrollUntilVisible(cardFinder, 200, scrollable: find.byType(Scrollable).last);
     expect(find.text('📡 Sensörler kapalı'), findsOneWidget);
     expect(find.textContaining('Donanım bilgisi alınamadı'), findsOneWidget);
 
@@ -211,6 +218,7 @@ void main() {
     await Hub.sensors.refresh();
     await Hub.sensors.start();
     await t.pumpAndSettle();
+    await t.scrollUntilVisible(cardFinder, 200, scrollable: find.byType(Scrollable).last);
 
     expect(find.text('📡 Sensörler açık (yalnız uygulama ön plandayken)'), findsOneWidget);
     expect(find.textContaining('Donanım bilgisi alınamadı'), findsNothing);

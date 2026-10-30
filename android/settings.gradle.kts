@@ -2,7 +2,6 @@ pluginManagement {
     val flutterSdkPath =
         run {
             val properties = java.util.Properties()
-            // local.properties UTF-8 okunur (Türkçe yol: Masaüstü)
             file("local.properties").reader(Charsets.UTF_8).use { properties.load(it) }
             val flutterSdkPath = properties.getProperty("flutter.sdk")
             require(flutterSdkPath != null) { "flutter.sdk not set in local.properties" }
@@ -17,6 +16,13 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
+extra["flutterSdkPath"] =
+    run {
+        val properties = java.util.Properties()
+        file("local.properties").reader(Charsets.UTF_8).use { properties.load(it) }
+        properties.getProperty("flutter.sdk")
+    }
 
 plugins {
     id("dev.flutter.flutter-plugin-loader") version "1.0.0"

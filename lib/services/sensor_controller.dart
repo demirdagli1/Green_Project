@@ -74,14 +74,25 @@ class SensorController extends ChangeNotifier {
 
   void _onEvent(Map<String, dynamic> e) {
     switch (e['type']) {
+      case 'sensor_started':
+        final gpsOn = e['gps'] == true;
+        final mode = e['gpsMode'] as String? ?? 'bilinmiyor';
+        store.telemetry.gpsStatus = gpsOn ? 'Dinleniyor ($mode)' : 'Konum kapalı/yetkisiz';
+        notifyListeners();
       case 'steps':
         final total = (e['total'] as num?)?.toInt();
         if (total != null) store.onSensorSteps(total);
+        notifyListeners();
       case 'accel':
+        final freq = (e['freqHz'] as num?)?.toDouble() ?? double.nan;
+        final variance = (e['variance'] as num?)?.toDouble() ?? double.nan;
+        final count = (e['sampleCount'] as num?)?.toInt() ?? 1;
         store.onAccel(
-          freqHz: (e['freqHz'] as num?)?.toDouble() ?? double.nan,
-          variance: (e['variance'] as num?)?.toDouble() ?? double.nan,
+          freqHz: freq,
+          variance: variance,
+          sampleCount: count,
         );
+        notifyListeners();
       case 'location':
         store.onLocation(
           lat: (e['lat'] as num?)?.toDouble() ?? double.nan,
@@ -89,9 +100,16 @@ class SensorController extends ChangeNotifier {
           speedMps: (e['speedMps'] as num?)?.toDouble(),
           accuracy: (e['accuracy'] as num?)?.toDouble(),
           tsMs: (e['ts'] as num?)?.toInt(),
+          provider: e['provider'] as String?,
         );
+        notifyListeners();
       case 'gpsDisabled':
+        store.telemetry.gpsStatus = 'Konum sağlayıcı devre dışı';
         lastEventNote = 'Konum kapatıldı.';
+        notifyListeners();
+      case 'gpsEnabled':
+        store.telemetry.gpsStatus = 'Konum sağlayıcı devrede (${e['provider'] ?? ''})';
+        lastEventNote = 'Konum açıldı.';
         notifyListeners();
       case 'nfc':
         lastNfcUid = e['uid'] as String?;
