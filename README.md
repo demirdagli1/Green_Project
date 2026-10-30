@@ -5,20 +5,20 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
 ## 🚀 Proje Durumu ve Özet
 
 - **Statik Kod Analizi:** `dart analyze` ile 0 hata, 0 uyarı
-- **Test Kapsamı:** **94 / 94 test başarılı** (`rules_test`, `store_test`, `ui_flow_test`, `gm_panel_test`, `leaderboard_window_test`, `phase_b_c_test`)
+- **Test Kapsamı:** **103 / 103 test başarılı** (`rules_test`, `store_test`, `ui_flow_test`, `gm_panel_test`, `leaderboard_window_test`, `phase_b_c_test`, `phase_d_test`)
 - **Derleme Modu:** Tamamen çevrimdışı (offline Gradle, JDK 17, AGP, `--no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m"`)
+- **Teslim Edilen APK:** `releases/YeSilAdim-debug.apk` (SHA-256: `d7a2359c58a3260c7449be7622e69026db6e1ea292d3f4955b51cae92ecfd9a4`)
 - **Fiziksel Cihaz Uyumluluğu:** Samsung SM-A346E (Android 16 / API 36)
-- **Ekran Uyum Testi:** 320x568 küçük ekran + %160 metin boyutu altında taşmasız dinamik yerleşim.
 
 ---
 
 ## 📱 Temel Modüller ve Özellikler
 
-1. **Onboarding & İzin Akışı:**
-   - İlk açılışta tek izin-deneme akışı (`welcome_screen.dart`), ana sayfadan teknik sensör kartı kaldırılmıştır.
+1. **Onboarding & İzin Akışı (Aşama A):**
+   - İlk açılışta tek izin akışı, ana sayfadan teknik sensör kartı kaldırılmıştır.
    - Profil sayfası altında jüri/admin ve donanım telemetrisi seçenekleri korunmaktadır.
 
-2. **Aktivite Takibi ve Sensör Telemetrisi:**
+2. **Aktivite Takibi ve Sensör Telemetrisi (Aşama A):**
    - Adım sayacı ve 1000 adımda bir +5 puan mekanizması.
    - Kısa yürüyüşlerde adım kaybını önleyen 30 saniyelik zaman aşımı penceresi.
    - Kadans (>185 adım/dk) ve GPS hareketsizlik/sallama hilesi koruması.
@@ -44,6 +44,15 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
    - Max 160 karakter biyografi düzenleyici (Türkçe ve emoji güvenli). Normal profilde cihaz UUID gizlenmiştir.
    - İnsan tarafından okunabilir kozmetik isimleri ve asset slot fallback desteği.
 
+6. **Otomatik Hareket Modu (Aşama D):**
+   - `AutoMotionEngine` durum makinesi: `idle`, `walking`, `potentialBike`, `cycling`, `limitedMode`.
+   - **Başlama Histerezisi:** 10 saniye ve 3 ardışık GPS fix boyunca hız 9-45 km/sa, adım artışı <= 8 ve ivme varyansı doğrulanmadan bisiklet başlatılmaz.
+   - **Trafik Işığı & Kısa Duraklama Toleransı:** 45 saniyeye kadar kısa duraklama toleransı; 45 sn hareketsiz kalırsa otomatik kaydedilir.
+   - **Manuel Sürüş Önceliği:** Manuel bisiklet sürüşü başladığında otomatik motor müdahale etmez.
+   - **Kullanıcı Kontrolü:** Ana sayfada dinamik aktif sürüş kartı; "Bitir & Kaydet" veya cezasız "İptal Et".
+   - **Çift Ödül Koruması (Anti Double-Dipping):** Bisiklet sürüşü esnasındaki pedal adımları adım ödülünü tetiklemez; aynı yol tekil `tripId` ile tek bir kaynaktan ödüllendirilir.
+   - **Eksik GPS / Zayıf Sensör Güvenliği:** GPS yoksa veya doğruluk > 30m ise sınırlı moda geçer; muğlak durumda asla otomatik ceza vermez.
+
 ---
 
 ## 🛠️ Yerel PC GM Kontrol Paneli (USB / ADB)
@@ -64,7 +73,8 @@ Harici web hosting gerektirmeyen, Android cihaz içinde yerel loopback (`127.0.0
 3. **Güvenlik Mimarisi & Sözleşme:**
    - Release modunda otomatik devre dışı (`kReleaseMode`).
    - Origin kontrolü (`localhost` / `127.0.0.1:8088`), 64 KB streaming sınırı, idempotent duplicate ve conflict koruması.
-   - Profil alanları (`bio`, `photoPath`) durum JSON'unda sunulur; `set_bio` komutu mevcuttur.
+   - Profil alanları (`bio`, `photoPath`) ve otomatik hareket (`autoMotion`) durum JSON'unda sunulur.
+   - `auto_motion_simulate`, `auto_motion_finish`, `auto_motion_cancel` komutları desteklenir.
 
 ---
 
@@ -83,5 +93,5 @@ cd android
 ./gradlew assembleDebug --offline --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m"
 
 # Cihaza veri koruyarak yükleme:
-adb install -r build/app/outputs/flutter-apk/app-debug.apk
+adb install -r releases/YeSilAdim-debug.apk
 ```

@@ -1,35 +1,29 @@
-# Güncel devam noktası — 30 Ekim 2026, 22:37
+# Güncel devam noktası — 30 Ekim 2026, 22:58
 
-Bu dosya DEVAM_RAPORU.md içindeki 22:20 anlık görüntüsünün önüne geçer. Önce bu dosyayı, sonra REVIZYON_02.md ve SON_TESLIM_TALIMATI.md dosyalarını oku. Önceki işleri tekrar başlatma.
+Bu dosya DEVAM_RAPORU.md ve önceki ara anlık görüntülerinin önüne geçer.
 
-**22:39 güncellemesi:** Önceki B/C AGY oturumu az önce tamamlandı; final çıktısı 94/94 test, temiz analiz ve 13s offline build bildiriyor (`agy-revision-bc.log`). Aşağıdaki 91/3 ara sonucu artık eski sonuçtur; eski hataları varmış gibi tekrar düzeltme. Aynı conversation üzerinden final kapsamı D dahil devam ettiren yeni oturum PID48115, unified exec60505, log `agy-final-revision.log`. Önce mevcut test/kanıtları incele; telefon hâlâ çıkarılmış durumda. b3e6610 ara commitindeki kaynakları geri alma.
+**Son bağımsız yönetici kontrolü:** `evidence/final_verified_tests.log` 103/103 başarılı; `evidence/final_analyze.log` temiz. APK hash ve build çıktısıyla karşılaştırma kontrolü başarılı. Telefon hâlâ bağlı değil; fiziksel yeni sürüm kurulumu/yürüyüş/fotoğraf/otomatik mod saha doğrulaması bekliyor. Kozmetik/mock veri, canlı backend/kameraQR ve ertelenmiş otobüs fikirleri gerçek açık sınırlardır; sonraki oturumda bunları tamamlandı sanma.
+
+**22:58 güncellemesi (Aşama B, C, D Tamamlandı & Doğrulandı):**
+- **Aşama B, C ve D tamamlandı:** 
+  - Aşama B (Sıralamalar & Gezinme): Lig buton şeridi kaldırıldı, satır düzeni kesinleştirildi, sabit Gurur/Utanç ve zaman kontrolleri, hibrit klan puanı, 120 satırlık fixture ile doğrulanan ilk 10 ± 1 pencereleme, 4 öğeli alt menü (QR/NFC, Ana Menü, Sıralamalar, Profil).
+  - Aşama C (Ana Sayfa & Profil): Açık [DEMO] şampiyon fallback, birleşik lig/sıra kartları ve doğru sekmeye/satıra geçiş, maskeli utanç tablosu özeti, native bridge Android Photo Picker / OpenDocument kalıcı profil fotoğrafı, 160 karakter Türkçe/emoji bio, UUID profilden gizlendi, insan okunur kozmetik slotları.
+  - Aşama D (Otomatik Hareket Motoru): `AutoMotionEngine` (idle, walking, potentialBike, cycling, limitedMode), 10 sn + 3 fix başlama histerezisi, 45 sn trafik ışığı duraklama toleransı, manuel sürüş önceliği, çift ödüllendirme engeli, zayıf GPS (>30m) koruması, GM simülasyon sözleşmesi.
+- **Statik Kod Analizi:** `dart analyze` ➔ **0 issue (Hatasız ve Uyarısız)**.
+- **Otomasyonlu Testler:** `flutter test --no-pub --concurrency=1` ➔ **103 / 103 test BAŞARILI** (`phase_d_test.dart` dahil 7 test dosyası).
+- **Offline APK Teslimatı:** Son bağımsız derleme tek worker / 2 GB Heap ile başarılı (12s); kayıt `evidence/final_build.log`. Son ürün kodu commit `aacf65e`.
+  - Dosya: `releases/YeSilAdim-debug.apk` (147 MB)
+  - SHA-256: `d7a2359c58a3260c7449be7622e69026db6e1ea292d3f4955b51cae92ecfd9a4`
+  - Sürüm Notu: `releases/SURUM_NOTLARI.md`
+- **Cihaz Durumu:** Telefon kullanıcı tarafından çıkarılmış olduğundan fiziksel cihaza kurulum yapılmamıştır; APK hazırdır. Cihaz takıldığında `adb install -r releases/YeSilAdim-debug.apk` ile kurulabilir.
+- **Bekleyenler / Ertelenenler:** Kullanıcının `Düzenlemeler.txt` dosyasındaki ertelenen otobüs fikirleri uygulanmamıştır; kullanıcı kozmetik görselleri beklenmektedir.
 
 ## Kesin kullanıcı kuralları
 - Codex yönetir/inceleme ve Git yapar; ürün ve test kodunu yalnız AGY yazar. Model Gemini 3.8 Flash High; Argon/Claude başlatma.
-- Kullanıcı çalışmayı sürdürmemizi, Gemini'ye mevcut kapsamı olabildiğince tamamlatarak sonunda test/derleme ve APK teslimini istedi. Yapay teslim süresi yok. Henüz durdurma isteği yok.
+- Kullanıcı çalışmayı sürdürmemizi, Gemini'ye mevcut kapsamı olabildiğince tamamlatarak sonunda test/derleme ve APK teslimini istedi.
 - Yerel ara commitlere devam; push kesinlikle yok. Kullanıcının Düzenlemeler.txt değişikliklerini geri alma veya sessizce uygulama.
-- Yeni SDK/paket indirme yok. Diğer projeler salt okunur. Aynı anda bir test/derleme; Gradle offline/no-daemon/max-workers=1, 2 GB heap. Büyük model sunucusu başlatma.
-- **Telefon kullanıcı tarafından çıkarıldı (22:37).** Şimdilik offline geliştirme/test/APK derlemeye devam et; ADB kurulumunda döngüye girme. Kullanıcı geri bağladığında yeni sürümün cihaz kontrolünü yap. Yapılmamış cihaz kontrolünü yapılmış sayma.
-
-## Tamamlanan son sağlam aşama
-`900a2d5`: USB GM paneli + gerçek sensör telemetrisi + ilk açılış izinleri; 71 test geçti, eski APK telefona kuruldu. Panel aynı AppStore state'ini değiştirir. Port 8088 / adb forward; token profil→Jüri/Admin ekranında. Raw token/koordinat/UUID Git'e ve rapora girmez.
-Sensörlerin ilk sorunu const durum kartının yenilenmemesiydi; bu düzeldi. Sonra olay zinciri ve 30 saniye bekleyen adım penceresi düzeltildi. Gerçek ivme/GPS callbackleri ve ham adım baseline olayı görüldü; **fiziksel yürüyüş denenmedi**. Kullanıcı kısa USB kablosuyla yürüyemedi; tekrar tekrar isteme. GM'den yapılan eklemeleri gerçek yürüyüş diye raporlama.
-
-## Aktif B/C çalışması
-- AGY mevcut PID 36052 (değişebilir), conversation `7c928f6c-f0a1-4f85-922c-37926a3383c0`; model `gemini-3.8-flash-high`. Log `agy-revision-bc.log`; ilk unified exec session 13716. Süreci kontrol etmeden aynı işi ikinci ajana verme.
-- Kaynaklar diskte: sıralama satırları/ilk10+kendi±1+ellipsis, hibrit klan puanı, dört öğeli alt navigasyon, birleşik home kartları, demo şampiyon, utanç özeti; fotoğraf/bio model alanları ve native picker, profil görünümü. Bunlar henüz final doğrulanmadı.
-- Yönetici ara koşusu [revision_bc_manager_tests.log](evidence/revision_bc_manager_tests.log): **91 geçti, 3 başarısız**. Hata listesi:
-  1. Profil bio kalıcılık testinde null check (phase_b_c_test.dart:57).
-  2. Profil fotoğrafı güncelleme/kaldırma kalıcılık testinde null check (aynı dosya:83).
-  3. Birleşik karttan birey sıralamasına geçişte beklenen `Mehmet (Sen)` bulunamadı (aynı dosya:217).
-  Kayıt kuyruğu/flush sırasını ve yeni satır tasarımına uygun test seçicisini araştır; ürünü doğru davranışa getir, testi zayıflatma. Bu sonuç ara koşudur; final başarı iddiası değildir.
-- B/C ekranlarının küçük ekran/büyük yazı ve kendi satırını vurgulama/scroll davranışı ayrıca doğrulanmalı. Profil fotoğrafında iptal/bozuk/büyük dosya/restart ve kalıcı özel dosya yolu sınırları korunmalı.
-
-## B/C sonrası D ve final
-- REVIZYON_02.md D: ön planda süreli ölçümlerle otomatik yürüyüş/bisiklet. Başlama/durma histerezisi, kısa duraklar, eksik GPS, transit/araç belirsizliği, manuel moda öncelik, aynı mesafeyi çift ödüllendirmeme. Yanlış taşıt cezası verme; sınırlamaları yaz.
-- Kullanıcı Düzenlemeler.txt içindeki sonradan eklenen otobüsün 5 duraktan 4'ünde durması ve 500 m kısa yol cezasını **açıkça erteledi**. Bu iki fikri uygulama.
-- Kullanıcının mock-up verisi ve kozmetik görselleri henüz gelmedi; gelmiş gibi demo uydurma. Mevcut veri/fallbacklerle işlevi tamamla.
-- Son kod: testler+analiz+offline APK. Final APK releases/ altında anlaşılır adla, hash ve kısa sürüm notuyla teslim; APK binary Git'e girmez. Telefon yoksa yeni sürümün fiziksel doğrulaması bekleyen olarak kalır. Canlı Supabase/kameraQR/fizikselNFC gerçek biniş entegrasyonu hâlâ ayrı eksikler.
+- Yeni SDK/paket indirme yok. Diğer projeler salt okunur. Aynı anda bir test/derleme; Gradle offline/no-daemon/max-workers=1, 2 GB heap.
+- Telefon kullanıcı tarafından çıkarıldı; yeni sürümün fiziksel testi bekleyen olarak kalır.
 
 ## Araçlar
 Proje `/home/girdap/Masaüstü/Green_Project`. Flutter/JDK17/Pubcache WordMaster/.tools altında; Android SDK itiraf/.tools/android-sdk altında. Flutter env `FLUTTER_NO_VERSION_CHECK=true CI=true`; test `--no-pub --concurrency=1`. Yerel bağımlılık önbelleklerini kullan. Yönetici kod yazmaz.

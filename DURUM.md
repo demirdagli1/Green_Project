@@ -1,31 +1,39 @@
 # Yeşil Adım — doğrulanmış durum
 
-30 Ekim 2026, revizyon02 / Aşama A, B ve C tamamlandı. Samsung SM-A346E, Android 16 / API 36 uyumlu. Yerel commitler tutulur, push yapılmaz. Kod AGY tarafından yazılmıştır; Codex görev, inceleme ve Git yönetimini yapar.
+30 Ekim 2026, revizyon02 / Aşama A, B, C ve D tamamlandı. Samsung SM-A346E, Android 16 / API 36 uyumlu. Yerel commitler yönetici tarafından tutulur, push yapılmaz. Kod AGY tarafından yazılmıştır.
 
-## Revizyon02 / Aşama B ve C Tamamlananlar
-- **Sıralamalar & Gezinme (Aşama B):**
-  - Yatay lig buton/filtre şeridi hem Bireysel hem Klan ekranından tamamen kaldırıldı.
-  - Sıralama satır düzeni kesin sıralamaya kavuşturuldu: `#RANK | AVATAR/FOTOĞRAF | İSİM/NİCK (altında klan adı) | LİG LOGOSU BADGE | PUAN`.
-  - Sabit sol Gurur/Utanç seçicisi ve sağda sabit zaman (Haftalık/Tüm Zamanlar) kontrol alanı sağlandı (layout shift engellendi).
-  - Klan Total/Hibrit seçicisi kaldırıldı; tüm klan sıralaması ve puanları sabit hibrit kuralına bağlandı: `0.6 * toplam + 0.4 * 50 * üye_ortalaması`. 5'ten az üyeli klanlar sıralamaya dahil edilmez.
-  - Pencereleme (Windowing) algoritması (`LeaderboardWindow`): İlk 10 + kullanıcının kendi satırı ± 1 komşusu, aradaki her boşluk için tek bir `…` ellipsis, gerçek rank numaraları korunur, mükerrer satır oluşmaz. 120 satırlık test fixture ile doğrulandı. Utanç tablosunda kullanıcının kaydı yoksa sahte kayıt uydurulmaz.
-  - Floating Action Button (FAB) tamamen kaldırıldı. 4 öğeli alt gezinme çubuğu (BottomNavigationBar): `[0] QR/NFC | [1] Ana Menü (varsayılan) | [2] Sıralamalar | [3] Profil`. Sistem geri tuşunda Ana Menü'ye dönüş, Ana Menü'de ise çıkış davranışı (`PopScope`) sağlandı.
-- **Ana Sayfa & Profil (Aşama C):**
-  - Demo şampiyon fallback: Henüz kesinleşmiş haftalık şampiyon yokken `👑 Geçen Haftanın Şampiyonları [DEMO]: ...` etiketiyle açıkça DEMO olduğu belirtilir; gerçek şampiyon oluştuğunda gerçek sonuç öncelik alır.
-  - Birleşik Ana Sayfa kartları: Tek bir "Klanım & Sıram" ve "Bireysel Ligim & Sıram" kartı. Tıklanınca Sıralamalar sekmesine geçerek doğrudan ilgili listeyi açar ve kullanıcının kendi satırını mor border ile vurgular.
-  - Maskeli Ana Sayfa Utanç Tablosu özeti: Maskeli isim (`Pel***`), avatar, haftalık yolculuk sayısı ve harcanan CO₂ bilgisi ile "Tam Tabloyu Gör >" geçiş linki eklendi.
-  - Profil fotoğrafı ve Bio: Harici paket indirmeden Kotlin native köprüsü (`MediaStore.ACTION_PICK_IMAGES` / `ACTION_OPEN_DOCUMENT`) ile fotoğraf seçme, güvenli 1024x1024 downsampling, `filesDir` içine kalıcı kopyalama, iptal/hata/restart dayanıklılığı. Max 160 karakter bio düzenleyici (Türkçe/emoji güvenli). Normal profilde cihaz UUID gösterimi kaldırıldı.
-  - Kozmetik mağazası ve envanter: Ham ID yerine insan tarafından okunabilir Türkçe adlar ve fallback etiketleri (`Varsayılan Yaprak`, `Çerçeve Yok`, vb.). Kullanıcı kozmetik görselleri henüz verilmediğinden harici paket/resim üretimi yapılmadı; mevcut asset slotları hazırlandı.
-  - PC GM paneli: Durum JSON sözleşmesine `bio` ve `photoPath` alanları eklendi; `set_bio` komutu eklendi.
+## Revizyon02 / Tamamlanan Aşamalar (A, B, C, D)
+- **Aşama A (Sensör Telemetrisi & PC GM Paneli):**
+  - Donanım sensör callbackleri, baseline kaydı, 30 sn bekleyen adım penceresi, tek açılış izin akışı.
+  - PC GM paneli (localhost:8088 / USB adb forward) token doğrulamalı tam kontrol sözleşmesi.
+- **Aşama B (Sıralamalar & Gezinme):**
+  - Yatay lig şeridi kaldırıldı.
+  - `#RANK | AVATAR | İSİM (altında klan) | LİG LOGOSU | PUAN` kesin satır düzeni.
+  - Sabit sol Gurur/Utanç ve sağ zaman kontrolü (layout shift yok).
+  - Klanlar yalnızca hibrit formül (`0.6 * toplam + 0.4 * 50 * üye_ortalaması`, <5 üye hariç).
+  - Top 10 + kendi satırı ± 1 komşusu, tek `…` ellipsis pencereleme (120 satırlık test fixture ile doğrulandı).
+  - 4 öğeli alt menü: `QR/NFC (0) | Ana Menü (1, varsayılan) | Sıralamalar (2) | Profil (3)`. FAB kaldırıldı, PopScope Ana Menü'ye döner.
+- **Aşama C (Ana Sayfa & Profil):**
+  - Açık `[DEMO]` etiketli geçen haftanın şampiyonu fallback desteği.
+  - Birleşik "Klanım & Sıram" ve "Bireysel Ligim & Sıram" kartları; tıklandığında ilgili sıralama listesini açıp kullanıcının kendi satırını vurgular.
+  - Maskeli Utanç Tablosu özeti (`Pel***`) ve tam tabloya geçiş linki.
+  - Paket indirmeden Kotlin Android Photo Picker / OpenDocument köprüsü üzerinden 1024x1024 downsampling ile profil fotoğrafı seçme/kaldırma ve restart kalıcılığı. Max 160 karakter bio düzenleyici. Normal profilde cihaz UUID gizlendi.
+  - İnsan okunur kozmetik varlık slotları. GM paneli durum JSON'ında `bio` ve `photoPath` alanları ve `set_bio` komutu.
+- **Aşama D (Otomatik Hareket Motoru):**
+  - `AutoMotionEngine` durum makinesi: `idle`, `walking`, `potentialBike`, `cycling`, `limitedMode`.
+  - Başlama histerezisi: 10 saniye ve 3 ardışık GPS fix boyunca 9-45 km/sa hız, düşük adım artışı ve ivme varyansı doğrulanmadan sürüş başlatılmaz.
+  - Durma histerezisi: Kırmızı ışık / kısa duraklamada 45 saniyeye kadar tolerans; 45 sn hareketsiz kalırsa otomatik kaydedilir.
+  - Manuel öncelik: Manuel sürüş başlatıldığında otomatik motor pasif kalır, sürüşü bozmaz.
+  - Ana sayfada dinamik aktif sürüş kartı; "Bitir & Kaydet" ve "İptal Et" kontrolleri.
+  - Çift ödül koruması: Bisiklet sürüşü adımları adım ödülünü tetiklemez; tekil `tripId` ile çifte puan önlenir.
+  - Eksik/zayıf GPS (accuracy > 30m): Sınırlı moda geçer, muğlak durumda asla otomatik ceza vermez.
+  - GM Paneli simülasyon komutları: `auto_motion_simulate`, `auto_motion_finish`, `auto_motion_cancel`.
 
 ## Kanıt ve Sınırlar
-- **Statik Kod Analizi:** `dart analyze` ile **0 issue** (hatasız ve uyarısız).
-- **Test Kapsamı:** **94 / 94 test geçti** (`rules_test`, `store_test`, `gm_panel_test`, `ui_flow_test`, `leaderboard_window_test`, `phase_b_c_test`).
-- **APK Derlemesi:** Tek-worker / 2GB JVM Heap ile tamamen çevrimdışı `./gradlew assembleDebug --offline --no-daemon --max-workers=1` başarıyla tamamlandı (13s), `build/app/outputs/flutter-apk/app-debug.apk` üretildi.
-- **Fiziksel Cihaz Kurulumu & Durumu:** Samsung SM-A346E (Android 16 / API 36) üzerinde önceki sürüm çalışır durumdadır. Cihaz USB bağlantısı geçici olarak ayrıldığında `adb install -r` için APK hazırdır.
-- **Kozmetik Görseller:** Kullanıcı tarafından sağlanacak görseller beklenmektedir.
-- **Aşama D (Otomatik Aktivite & Süreli Ölçümler):** Bir sonraki aşamada ele alınacaktır; mevcut mimariyi bozmadan eklenecektir.
-
-## Araçlar ve Çalışma Ortamı
-Flutter/JDK17/Pub cache: `/home/girdap/Masaüstü/WordMaster/.tools/`. Android SDK: `/home/girdap/Masaüstü/itiraf/.tools/android-sdk`.
-Flutter için `FLUTTER_NO_VERSION_CHECK=true CI=true`, offline testte `--no-pub --concurrency=1`. Gradle: `./gradlew assembleDebug --offline --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m"`. Yeni paket indirme veya dış ağ çağrısı yapılmamıştır.
+- **Statik Kod Analizi:** `dart analyze` ➔ **0 issue (Hatasız ve Uyarısız)**.
+- **Test Kapsamı:** **103 / 103 test BAŞARILI** (`rules_test`: 20, `store_test`: 32, `gm_panel_test`: 13, `ui_flow_test`: 6, `leaderboard_window_test`: 12, `phase_b_c_test`: 11, `phase_d_test`: 9). Bağımsız son koşu: [final_verified_tests.log](evidence/final_verified_tests.log); bağımsız analiz: [final_analyze.log](evidence/final_analyze.log).
+- **Offline APK Derlemesi:** Son bağımsız derleme tek worker / 2 GB Heap ile başarılı (12s). Kanıt: [final_build.log](evidence/final_build.log).
+- **Teslim Edilen APK:** `releases/YeSilAdim-debug.apk` (yaklaşık 147 MB, SHA-256: `d7a2359c58a3260c7449be7622e69026db6e1ea292d3f4955b51cae92ecfd9a4`).
+- **Fiziksel Cihaz Durumu:** Telefon kullanıcı tarafından çıkarıldığı için yeni sürümün fiziksel cihaza kurulumu henüz yapılmamıştır; APK `releases/` altında yüklenmeye hazır beklemektedir.
+- **Kozmetik Görseller & Mockup:** Kullanıcı tarafından sağlanacak görseller ve mockup verisi henüz verilmediğinden açık bekleyen durumdadır; slotlar hazırdır.
+- **Ertelenen Otobüs Fikirleri:** Kullanıcının `Düzenlemeler.txt` notlarındaki "5 duraktan 4'ünde durma" ve "500m kısa yol cezası" fikirleri talimat doğrultusunda ertelenmiştir ve uygulanmamıştır.
