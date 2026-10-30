@@ -1,6 +1,8 @@
 # Yeşil Adım — görev sözleşmesi
 
 ## Yetki ve sorumluluk
+- Son netleştirme: kullanıcı yeniden özellikle Gemini 3.8 Flash High istedi. Aktif B/C oturumu zaten Flash High ve korunuyor. Kullanıcı başka söylemedikçe bu modelle devam; Argon/Claude başlatma. Aşağıdaki eski Medium önerisi bu son tercihe tabidir.
+- En güncel model tercihi (kullanıcının son mesajı): Gemini limitlerini koru, AGY Flash kullan. Argon/Claude'a kendiliğinden geçme. Devam eden B/C Flash High oturumunu gereksiz yeniden başlatma; sonraki görev/hata düzeltmelerini Flash Medium ile yürüt, kısa bağlam ve tek MD sözleşmesini kullan. Tekrar eden başarılı testleri sebepsiz çalıştırma.
 - Güncel zaman/model sınırı (30 Ekim 2026 20:50 Europe/Istanbul): kullanıcının 35 dakika ifadesi TESLİM SÜRESİ DEĞİL, limit yenilenmesine kalan süredir. Flash High kullanılabilir. Argon limit yenilenmesinin son 15 dakikasında, yani yaklaşık 21:10 sonrasında gerekirse kullanılabilir; daha önce başlatma. Teslim için yapay süre sınırı yok; eksik doğrulamayla işi kapatma. Claude kotası tükendi. Token tasarrufu için geçmişi tekrar tarama ve aynı testi sonuç değişmeden yineleme.
 - Kullanıcı: Codex yalnızca yönetir, kod yazmaz. Uygulama, test ve yapılandırma kodunu AGY alt ajanı yazar. İlk model gemini-3.8-flash-low; yönetici kalite gerekçesiyle medium veya Claude'a yükseltebilir. Hermes/Deepseek bu aşamada kullanılmaz.
 - Asıl kapsam: codex_flutter_android_yonergesi.md ve Şablon.png. Kullanıcının son talimatları üstündür. Önce işlev ve yerleşim; görsel cilalama sonra. Gereksiz animasyon/illüstrasyon üretme.

@@ -44,6 +44,7 @@ Bu dosya kullanıcının 30 Ekim akşamı verdiği yeni istekleri toplar. AGENT_
 - Kozmetik görselleri kullanıcı sağlayacak; görüntü/çerçeve/pet asset slotları hazırlansın, görsel üretme/paket indirme yok. Mevcut text kimliklerini normal kullanıcıya göstermek yerine insan okunur ad/fallback kullan.
 
 ## Aşama D — otomatik hareket modu
+- Kullanıcı 22:13 civarı açıkça erteledi: Düzenlemeler.txtye sonradan eklenen otobüsün 5duraktan4ünde durmasıyla tespit ve 500m kısa otobüs yoluna ceza fikirleri bu pakete dahil DEĞİLDİR. Önce buradaki mevcut işi bitir; o iki fikri sonradan ele al.
 - Kullanıcının bir süre tutarlı hareketiyle yürüyüş/bisiklet uygun modunu otomatik başlat. Başlangıçta ön planda çalışma sınırını açık tut; arka plan garantisi iddia etme. Manuel bisiklet ve otomatik seçim çatışmasın; kullanıcı durdurma/iptal seçeneği olsun.
 - Sadece tek GPS hızına göre bisiklet/araç kararı verme. Süreli pencere+hız doğruluğu+adım değişimi+ivme, başlangıç/durma histerezisi, bekleme/durgun/ yürüyüş/ olası bisiklet durumları. Eksik sensörde sınırlı mod, muğlak taşıtta otomatik ceza yok. Otobüs/transit, trafik ışığı, kısa duruş, GPS sıçraması, zayıf GPS, telefon sallama, ardışık kısa oturum/aynı yol iki kez ödül gibi edge case'ler belgeli ve kritik kurallar testli olsun.
 - Seçilen başlangıç/durma süre ve eşiklerini uygulama kararı olarak README'de belirt; bilimsel kesinlik gibi sunma. Deneme/GM panelinden saat hızlandırılmış ölçüm akışıyla deterministik doğrulanabilir olsun.
