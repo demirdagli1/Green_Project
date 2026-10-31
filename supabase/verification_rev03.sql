@@ -148,91 +148,30 @@ BEGIN
     EXECUTE format('SET LOCAL request.jwt.claim.sub = %L', v_user_id);
     EXECUTE 'SET LOCAL role = authenticated';
 
-    -- Test 3.1: Düşük güven / yetersiz skor testi (<60 skor reddedilmeli)
-    v_res := public.rpc_record_bus_trip(
-        p_event_id := 'test_bus_evt_low',
-        p_distance_km := 5.2,
-        p_bus_score := 45,
-        p_confidence := 0.50,
-        p_stop_code := 'TRB-KTU-01',
-        p_explanation := 'Zayıf skor'
-    );
-    IF (v_res->>'ok')::BOOLEAN != false THEN
-        RAISE EXCEPTION 'TEST 3.1 HATA: Skor < 60 reddedilmeliydi!';
-    END IF;
-
-    -- Test 3.2: Saf otomatik kısa otobüs yolculuğu (0.40 km <= 0.50 km, QR yok) -> 3 puan düşülür
+    -- Test 3: Otomatik otobüs motoru ayrı dalda (.worktrees/automatic-bus) geliştirildiği için
+    -- ana teslimatta rpc_record_bus_trip güvenli 'dormant' durum döndürmeli ve puan mutasyonu yapmamalıdır.
     SELECT weekly_points INTO v_pts_before FROM public.users WHERE id = v_user_id;
 
     v_res := public.rpc_record_bus_trip(
-        p_event_id := 'test_bus_evt_short_pure',
-        p_distance_km := 0.40,
-        p_bus_score := 80,
-        p_confidence := 0.95,
-        p_stop_code := 'TRB-KTU-01',
-        p_explanation := 'Saf otomatik kısa yol'
-    );
-    IF (v_res->>'ok')::BOOLEAN != true OR (v_res->>'points_delta')::INT != -3 THEN
-        RAISE EXCEPTION 'TEST 3.2 HATA: Kısa otobüs yolculuğu -3 puan cezası vermeliydi! Sonuç: %', v_res;
-    END IF;
-
-    SELECT weekly_points INTO v_pts_after FROM public.users WHERE id = v_user_id;
-    IF v_pts_after != (v_pts_before - 3) THEN
-        RAISE EXCEPTION 'TEST 3.2 HATA: 3 puan düşülmedi! Önce: %, Sonra: %', v_pts_before, v_pts_after;
-    END IF;
-
-    -- Test 3.3: İki yönlü uzlaştırma: QR biniş (+3) + Kısa Yol (≤500m) sonunda ödül geri alma ve net -3 ceza
-    -- Fixture güncellemesi için postgres rolüne dön:
-    RESET ROLE;
-    DELETE FROM public.transit_cooldowns WHERE user_id = v_user_id;
-    UPDATE public.users SET weekly_points = 20 WHERE id = v_user_id;
-    INSERT INTO public.transit_cooldowns (user_id, stop_code, last_scanned_at)
-    VALUES (v_user_id, 'TRB-KTU-01', NOW()); -- QR binişi yapıldı
-
-    EXECUTE format('SET LOCAL request.jwt.claim.sub = %L', v_user_id);
-    EXECUTE 'SET LOCAL role = authenticated';
-
-    -- Yolculuk bitiminde otomatik motor mesafe <= 500m olduğunu tespit eder:
-    v_res := public.rpc_record_bus_trip(
-        p_event_id := 'test_bus_evt_qr_then_short',
-        p_distance_km := 0.35,
+        p_event_id := 'test_bus_evt_dormant',
+        p_distance_km := 5.2,
         p_bus_score := 85,
         p_confidence := 0.95,
         p_stop_code := 'TRB-KTU-01',
-        p_explanation := 'QR biniş sonrası kısa yol bitimi'
+        p_explanation := 'Dormant otobüs testi'
     );
-    IF (v_res->>'ok')::BOOLEAN != true OR (v_res->>'points_delta')::INT != -6 THEN
-        RAISE EXCEPTION 'TEST 3.3 HATA: QR binişli kısa yol için +3 iptal + -3 ceza = -6 puan kesilmeliydi! Sonuç: %', v_res;
+
+    IF (v_res->>'ok')::BOOLEAN != false OR (v_res->>'dormant')::BOOLEAN != true OR (v_res->>'points_delta')::INT != 0 THEN
+        RAISE EXCEPTION 'TEST 3 HATA: rpc_record_bus_trip dormant:true ve points_delta:0 dönmeliydi! Sonuç: %', v_res;
     END IF;
 
     SELECT weekly_points INTO v_pts_after FROM public.users WHERE id = v_user_id;
-    IF v_pts_after != 14 THEN -- 20 - 6 = 14 (Başlangıç 17 iken net -3 ceza)
-        RAISE EXCEPTION 'TEST 3.3 HATA: Bakiye 14 olmalıydı! Mevcut: %', v_pts_after;
-    END IF;
-
-    -- Test 3.4: Normal yolculuk (>500m) ve QR binişi: Tek yolculuk tek settlement (+0 puan ilave, CO2 var)
-    RESET ROLE;
-    DELETE FROM public.transit_cooldowns WHERE user_id = v_user_id;
-    INSERT INTO public.transit_cooldowns (user_id, stop_code, last_scanned_at)
-    VALUES (v_user_id, 'TRB-KTU-01', NOW()); -- QR binişi yapıldı
-
-    EXECUTE format('SET LOCAL request.jwt.claim.sub = %L', v_user_id);
-    EXECUTE 'SET LOCAL role = authenticated';
-
-    v_res := public.rpc_record_bus_trip(
-        p_event_id := 'test_bus_evt_qr_then_normal',
-        p_distance_km := 5.0,
-        p_bus_score := 85,
-        p_confidence := 0.95,
-        p_stop_code := 'TRB-KTU-01',
-        p_explanation := 'QR biniş sonrası normal yol'
-    );
-    IF (v_res->>'ok')::BOOLEAN != true OR (v_res->>'points_delta')::INT != 0 OR (v_res->>'already_qr_settled')::BOOLEAN != true THEN
-        RAISE EXCEPTION 'TEST 3.4 HATA: QR sonrası normal yol için points_delta=0 ve already_qr_settled=true olmalıydı! Sonuç: %', v_res;
+    IF v_pts_after != v_pts_before THEN
+        RAISE EXCEPTION 'TEST 3 HATA: Dormant otobüs çağrısı puan değiştirmemeliydi! Önce: %, Sonra: %', v_pts_before, v_pts_after;
     END IF;
 
     RESET ROLE;
-    RAISE NOTICE 'TEST 3 BAŞARILI: Kısa otobüs cezası, iki yönlü QR uzlaştırması ve tek settlement doğrulandı ✅';
+    RAISE NOTICE 'TEST 3 BAŞARILI: Otomatik otobüs fonksiyonu güvenli dormant durumunda ve puan mutasyonsuz doğrulandı ✅';
 END $$;
 
 

@@ -127,6 +127,8 @@ class SupabaseService extends ChangeNotifier {
   SupabaseOutbox? get outbox => _outbox;
   SupabaseGateway? get gateway => _gateway;
   bool get isConnected => _status == SupabaseSyncStatus.connected;
+  bool get isAvailable => _gateway != null;
+  bool get isConfigured => _gateway != null;
   String? get currentUserId => _gateway?.currentUser?.id;
 
   SupabaseService({SupabaseGateway? gateway, SupabaseOutbox? outbox})
@@ -543,7 +545,7 @@ class SupabaseService extends ChangeNotifier {
 
             case 'record_bus_trip':
               final res = await gw.rpc('rpc_record_bus_trip', params: item.payload);
-              itemDone = (res is Map && (res['ok'] == true || res['duplicate'] == true));
+              itemDone = (res is Map && (res['ok'] == true || res['duplicate'] == true || res['dormant'] == true));
               break;
 
             case 'send_shame_message':

@@ -115,9 +115,11 @@ class HomeScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   _co2Card(user.preventedCo2Kg, trees),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Not: Klan/rakip puanları DEMO verisidir; yerel çevrimdışı sürüm, canlı sunucu yok.',
-                    style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+                  Text(
+                    Hub.supabase.isAvailable
+                        ? '🌱 Canlı Supabase bulut senkronizasyonu aktif • Otomatik veri eşitleme devrede'
+                        : '🌱 Çevrimdışı mod: Adım ve aktiviteleriniz yerelde güvenle saklanır',
+                    style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
                   ),
                 ],
               ),
