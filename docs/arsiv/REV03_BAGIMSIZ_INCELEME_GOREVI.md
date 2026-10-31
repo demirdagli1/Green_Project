@@ -1,0 +1,13 @@
+# Bağımsız AGY inceleme — yalnız rapor
+
+AGENT_YONETIM.md, REVIZYON_03.md, REV03_INCELEME_NOTU.md, AŞAMA_03_ROOT_SONUC.md oku. Yalnız REV03_BAGIMSIZ_INCELEME.md yaz. Diğer AGY ürün/SQL düzeltiyor, onun dosyalarını DEĞİŞTİRME. Test/build/git/canlı mutasyon yok. Salt okunur inceleme yap; dosyalar güncellenirse son halden değerlendir. Token tasarrufu: somut kritik kusur, dosya/satır, tetikleme, beklenen düzeltme; uzun genel öğüt yok.
+
+İnceleme kapsamı tüm rev03 diff: supabase/06 incremental SQL ve verification_rev03.sql, native sensör → classifier → store → outbox → server entegrasyonu; gerçek GM panel, setup script, iki oturum testinin sahte pozitif riski; private alanların RLS/Realtimes izolasyonu; utanç mesaj kota/altın yarışları/idempotency/reset; QR/NFC/auto bus aynı yolculuk tek settlement ve CO2/weekly/alltime/clan sayılarının tutarlılığı; geçmiş outbox retry kalıcılığı/sessiz veri kaybı; profil pet sahipliği, klan listesinin doğru veri/görseli; planlanan özellik ile gerçek çalışan ayrımı. Kaynakları göster, varsayımı kanıttan ayır.
+
+Root'un henüz açık şüpheleri:
+- setup_admin_session.dart secret JSON'u tools/universal_gm içinde yazıyor; o dizin http.server ile sunuluyor: root explicit yasakladı. PRIVATE oturum web root DIŞINDA kalmalı. Script ilk profil RPC oluşturmuyor mu? Admin audit FK public.users'e bağlı, tek server_admins satırı yetmez. .private.json ignore yoksa sızıntı. Script her çalıştırmada yeni anon admin oluşturmasın, mevcut güvenli sessionı reuse etsin. Panel innerHTML kullanıcı nick/message üzerinden XSS varsa admin token çalınır.
+- Otobüs generic45min cooldown journey kimliği değil; QR ödülü +3 ve CO2 geri alınması / short penalty -3 net; alltime/clan ve CO2 ters kayıtlar; AUTO_BUS_TRIP ile QR farklı stop keys; ters sırada QR sonradan +3; cooldown user kilidinden önceyse yarış. Aynı id farklı payload idempotent. Şüpheli GPS asla otomatik ceza yapmasın; server user input mutlak kanıt değildir.
+- İlk SQLde CREATE OR REPLACE VIEW mevcut kolon sıraları/isimleri farklıysa dağıtım hata verir; 01_schema/grant public sözleşmesi ile kontrol et. Bus activity CHECK uyumu, notifications gerçek kolon adları. Definer auth, PUBLIC execute revoke. p_bus_score/confidence istemci beyanı sınırını belgele.
+- İlk APK131test raporu canlı HTTP çok cihaz kanıtı değil. tools/test_two_sessions.dart gerçek API testini düzgün assert/exit ediyor mu, hataları catch edip başarı mı diyor, yeni fixturelarda mutasyon scope mu, token stdout sızıyor mu.
+
+Çıktı en fazla birkaç sayfa, önce dağıtım engelleri. Bittiğinde kısa rapor; root sonrasında ürün ajanına düzelttirecek. Kimse kod yazan Codex istemiyor; SQL/test/ürün yine AGY'ye ait.
