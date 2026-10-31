@@ -30,15 +30,19 @@ class HomeScreen extends StatelessWidget {
       listenable: Listenable.merge([Hub.store, Hub.sensors]),
       builder: (context, _) {
         final store = Hub.store;
-        final user = store.me;
-        if (user == null) return const SizedBox.shrink();
-        final clan = store.myClan;
+        final localUser = store.me;
+        if (localUser == null) return const SizedBox.shrink();
+        if (localUser.serverUserId != null && store.serverProfile == null) {
+          return const Scaffold(body: Center(child: Text('Sunucu profil verisi bekleniyor.')));
+        }
+        final user = store.serverProfile ?? localUser;
+        final clan = store.serverMyClan;
         final indTier = LeagueTier.fromPoints(user.weeklyPoints, category: LeagueCategory.individual);
         final clanTier = LeagueTier.fromPoints(clan?.weeklyPoints ?? 0, category: LeagueCategory.clan);
         final steps = user.todaySteps;
         final remaining = 1000 - (steps % 1000);
         final clanRank = clan == null ? 0 : store.rankedClans().indexWhere((c) => c.id == clan.id) + 1;
-        final userRank = store.rankedUsers().indexWhere((u) => u.id == user.id) + 1;
+        final userRank = store.rankedUsers().indexWhere((u) => u.id == (user.serverUserId ?? user.id)) + 1;
         final trees = (user.preventedCo2Kg / AppStore.demoTreeCo2Kg).floor();
 
         return Scaffold(
@@ -553,7 +557,7 @@ class HomeScreen extends StatelessWidget {
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
-                'Bu hafta kimse utanç tablosunda değil. 🎉',
+                'Sunucu listesi boş veya henüz yüklenmedi.',
                 style: TextStyle(fontSize: 12, color: AppColors.textMuted),
               ),
             )

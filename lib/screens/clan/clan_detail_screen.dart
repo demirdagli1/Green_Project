@@ -31,29 +31,7 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> {
 
   List<AppUser> _getClanMembers(AppStore store) {
     final clanId = widget.clan.id;
-    final Map<String, AppUser> deduped = {};
-
-    // 1. Canlı sunucu kullanıcıları
-    for (final su in store.serverUsers) {
-      if (su.clanId == clanId) {
-        deduped[su.serverUserId ?? su.id] = su;
-      }
-    }
-
-    // 2. Demo kullanıcıları
-    for (final du in store.demoUsers) {
-      if (du.clanId == clanId && !deduped.containsKey(du.id)) {
-        deduped[du.id] = du;
-      }
-    }
-
-    // 3. Mevcut kullanıcı bu klandaysa
-    if (store.me != null && store.me!.clanId == clanId) {
-      final myKey = store.me!.serverUserId ?? store.me!.id;
-      deduped[myKey] = store.me!;
-    }
-
-    final members = deduped.values.toList();
+    final members = store.serverUsers.where((u) => u.clanId == clanId).toList();
     // Sıralama: Haftalık puan DESC, tüm zamanlar DESC, isim ASC
     members.sort((a, b) {
       final c = b.weeklyPoints.compareTo(a.weeklyPoints);
@@ -91,7 +69,7 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> {
       builder: (context, _) {
         final store = Hub.store;
         // Güncel klan nesnesini store'dan bul (yoksa parametredeki klanı kullan)
-        final clan = store.clans.firstWhere(
+        final clan = store.serverClans.firstWhere(
           (c) => c.id == widget.clan.id,
           orElse: () => widget.clan,
         );

@@ -270,11 +270,10 @@ void main() {
     });
 
     test('utanç panosu: sunucu snapshotı boşsa demo fallback yapılmaz, online liste esastır', () {
-      // 1. Çevrimdışı durumda demo fallback çalışır
+      // 1. Sunucu snapshot'ı yoksa demo sıralaması gösterilmez
       store.isServerShameLoaded = false;
       final offlineList = store.shameBoard();
-      expect(offlineList.isNotEmpty, true);
-      expect(offlineList.any((u) => u.username.contains('Pelinsu')), true);
+      expect(offlineList, isEmpty);
 
       // 2. Sunucu snapshotı başarıyla yüklendi ancak boş (0 israfçı var):
       store.isServerShameLoaded = true;

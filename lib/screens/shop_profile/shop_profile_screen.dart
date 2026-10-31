@@ -123,8 +123,12 @@ class ShopProfileScreen extends StatelessWidget {
       builder: (context, _) {
         final store = Hub.store;
         final sb = Hub.supabase;
-        final u = store.me;
-        if (u == null) return const SizedBox.shrink();
+        final localUser = store.me;
+        if (localUser == null) return const SizedBox.shrink();
+        if (localUser.serverUserId != null && store.serverProfile == null) {
+          return const Scaffold(body: Center(child: Text('Sunucu profil verisi bekleniyor.')));
+        }
+        final u = store.serverProfile ?? localUser;
 
         final hasPhoto = u.photoPath != null && u.photoPath!.isNotEmpty && File(u.photoPath!).existsSync();
 

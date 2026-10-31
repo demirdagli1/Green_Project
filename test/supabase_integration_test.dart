@@ -16,9 +16,12 @@ class TestMockSupabaseGateway implements SupabaseGateway {
   final Set<String> failingViews = {};
 
   final Map<String, dynamic> dbUsers = {};
+  Map<String, dynamic>? profileRow;
   final Set<String> processedEvents = {};
   final List<Map<String, dynamic>> leaderboardRows = [];
+  final List<Map<String, dynamic>> clanRows = [];
   final List<Map<String, dynamic>> shameBoardRows = [];
+  int shameQueries = 0;
   final List<RealtimeChannel> activeChannels = [];
 
   TestMockSupabaseGateway({String userId = 'test-user-uuid-1'}) {
@@ -77,6 +80,8 @@ class TestMockSupabaseGateway implements SupabaseGateway {
     }
 
     switch (functionName) {
+      case 'rpc_get_my_profile':
+        return {'ok': true, 'user': profileRow ?? {'id': mockUser!.id}, 'clan': {'name': 'Sunucu Klan'}};
       case 'rpc_sync_initial_profile':
         final uid = mockUser!.id;
         if (dbUsers.containsKey(uid)) {
@@ -166,19 +171,25 @@ class TestMockSupabaseGateway implements SupabaseGateway {
   Future<List<Map<String, dynamic>>> queryTableOrView(
     String name, {
     int? limit,
+    int offset = 0,
     String? orderBy,
     bool ascending = false,
   }) async {
     if (shouldFailNetwork || failingViews.contains(name)) {
       throw const SocketException('Ağ hatası');
     }
+    List<Map<String, dynamic>> rows;
     if (name == 'v_leaderboard_users') {
-      return leaderboardRows;
+      rows = leaderboardRows;
+    } else if (name == 'v_clan_leaderboard') {
+      rows = clanRows;
+    } else if (name == 'v_global_shame_board') {
+      shameQueries++;
+      rows = shameBoardRows;
+    } else {
+      rows = [];
     }
-    if (name == 'v_global_shame_board') {
-      return shameBoardRows;
-    }
-    return [];
+    return rows.skip(offset).take(limit ?? rows.length).toList();
   }
 
   @override
@@ -319,6 +330,7 @@ void main() {
       final initialPending = outbox.pendingCount;
       // Doğrudan store'da değişiklik yapıldığında echo suppression bayrağı kontrollü çalışır
       expect(initialPending, 0);
+      service.dispose();
     });
 
     test('5. İki Farklı Auth Oturumu Aynı Liderlik Tablosunu Görür ve Dedupe Edilir', () async {
@@ -397,11 +409,11 @@ void main() {
       // Mağaza, adımlar, duraklar yerel demo verileriyle kesintisiz çalışır
       expect(store.shopItems.isNotEmpty, isTrue);
       expect(store.stops.length, 7);
-      expect(store.rankedClans().length, 11);
+      expect(store.rankedClans(), isEmpty);
 
       // Sıralamada demo etiketleri korunur
       final ranked = store.rankedUsers();
-      expect(ranked.any((u) => u.isDemo), isTrue);
+      expect(ranked, isEmpty);
     });
 
     test('8. update_bio ağ/bağlantı hatasında outbox öğesini SESSİZCE SİLMEZ, kuyrukta saklar', () async {
@@ -504,6 +516,74 @@ void main() {
       expect(service.status, SupabaseSyncStatus.connected);
       expect(service.lastError, isNull);
       expect(service.lastSyncTime, isNotNull);
+      service.dispose();
+    });
+
+    test('Realtime olayı kaybolsa bile ortak utanç sırası yenilenir ve dispose yenilemeyi durdurur', () async {
+      final gateway = TestMockSupabaseGateway(userId: 'user');
+      final service = SupabaseService(
+        gateway: gateway, shameRefreshInterval: const Duration(milliseconds: 40),
+      );
+      gateway.shameBoardRows.addAll([
+        {'user_id': 'a', 'masked_name': 'A***', 'weekly_wasted_co2_kg': 2.0},
+        {'user_id': 'b', 'masked_name': 'B***', 'weekly_wasted_co2_kg': 1.0},
+      ]);
+      await service.fetchServerShameBoard(store);
+      expect(store.shameBoard().map((u) => u.id).toList(), ['a', 'b']);
+      service.setupRealtimeSubscriptions(store);
+      gateway.shameBoardRows
+        ..clear()
+        ..addAll([
+          {'user_id': 'b', 'masked_name': 'B***', 'weekly_wasted_co2_kg': 3.0},
+          {'user_id': 'a', 'masked_name': 'A***', 'weekly_wasted_co2_kg': 2.0},
+        ]);
+      await Future<void>.delayed(const Duration(milliseconds: 110));
+      expect(store.shameBoard().map((u) => u.id).toList(), ['b', 'a']);
+      expect(store.shameBoard().first.weeklyWastedCo2Kg, 3.0);
+      service.scheduleShameRefresh(store);
+      service.dispose();
+      final afterDispose = gateway.shameQueries;
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      expect(gateway.shameQueries, afterDispose);
+    });
+
+    test('Ortak sıralamalar yalnız sunucudan gelir; tüm sayfalar ve boş yanıt uygulanır', () async {
+      final gateway = TestMockSupabaseGateway(userId: 'me');
+      final service = SupabaseService(gateway: gateway);
+      store.register(deviceId: 'local', name: 'Yerel', clanName: 'KTÜ Kanuni');
+      store.me = store.me!.copyWith(serverUserId: 'me', weeklyPoints: 999999);
+      for (var i = 0; i < 501; i++) {
+        gateway.leaderboardRows.add({'user_id': i == 500 ? 'me' : 'u$i', 'nickname': 'U$i', 'weekly_points': i});
+      }
+      gateway.clanRows.add({'clan_id': 1, 'clan_name': 'Sunucu Klan', 'member_count': 5,
+        'weekly_points': 10, 'all_time_points': 20, 'weekly_wasted_co2_kg': 4.0});
+      expect(await service.fetchServerLeaderboard(store), isTrue);
+      expect(store.rankedUsers(), hasLength(501));
+      expect(store.rankedUsers().first.id, 'me');
+      expect(store.rankedUsers().first.weeklyPoints, 500);
+      expect(store.rankedClans().single.name, 'Sunucu Klan');
+      expect(store.worstClans().single.weeklyWastedCo2Kg, 4.0);
+      gateway.leaderboardRows.clear();
+      gateway.clanRows.clear();
+      expect(await service.fetchServerLeaderboard(store), isTrue);
+      expect(store.rankedUsers(), isEmpty);
+      expect(store.rankedClans(), isEmpty);
+      expect(store.worstClans(), isEmpty);
+      service.dispose();
+    });
+
+    test('Özel profil sunucudan okunur ve bekleyen yerel durumu değiştirmez', () async {
+      final gateway = TestMockSupabaseGateway(userId: 'me');
+      gateway.profileRow = {'id': 'me', 'nickname': 'Sunucu', 'clan_id': 1,
+        'today_steps': 100, 'weekly_points': 10, 'gold_coins': 20};
+      final service = SupabaseService(gateway: gateway);
+      store.register(deviceId: 'local', name: 'Yerel', clanName: 'KTÜ Kanuni');
+      store.me = store.me!.copyWith(serverUserId: 'me', todaySteps: 150, goldCoins: 99);
+      expect(await service.fetchServerProfile(store), isTrue);
+      expect(store.serverProfile!.todaySteps, 100);
+      expect(store.serverProfile!.goldCoins, 20);
+      expect(store.me!.todaySteps, 150);
+      expect(store.me!.goldCoins, 99);
       service.dispose();
     });
   });

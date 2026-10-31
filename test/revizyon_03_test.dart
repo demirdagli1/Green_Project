@@ -173,6 +173,7 @@ void main() {
     setUp(() async {
       store = AppStore(backend: MemoryStore());
       await store.load();
+      store.serverClans = List.of(store.clans);
     });
 
     test('3.1 worstClans() en yüksek CO2 israfı yapan klanları deterministik sıralar', () {
@@ -184,15 +185,15 @@ void main() {
         final b = worst[i + 1];
         if (a.weeklyWastedCo2Kg != b.weeklyWastedCo2Kg) {
           expect(a.weeklyWastedCo2Kg, greaterThanOrEqualTo(b.weeklyWastedCo2Kg));
-        } else if (a.weeklyPoints != b.weeklyPoints) {
-          expect(a.weeklyPoints, lessThanOrEqualTo(b.weeklyPoints));
+        } else {
+          expect(a.id.compareTo(b.id), lessThanOrEqualTo(0));
         }
       }
     });
 
     test('3.2 Klan utanç listesi 5 üyeden az olan klanlarda çökmeksizin çalışır', () {
       final smallClan = const Clan(id: 'clan_small', name: 'Küçük Klan', memberCount: 2, weeklyPoints: 10, weeklyWastedCo2Kg: 8.5);
-      store.clans.add(smallClan);
+      store.serverClans.add(smallClan);
 
       final worst = store.worstClans();
       expect(worst.any((c) => c.id == 'clan_small'), isTrue);

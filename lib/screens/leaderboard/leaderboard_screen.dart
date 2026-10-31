@@ -37,7 +37,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Hub.store,
+      listenable: Listenable.merge([Hub.store, Hub.supabase]),
       builder: (context, _) {
         final store = Hub.store;
         return Scaffold(
@@ -54,6 +54,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           ),
           body: Column(
             children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                child: Text(
+                  Hub.supabase.lastSyncTime == null
+                      ? 'Sunucu verileri bekleniyor.'
+                      : 'Son sunucu güncellemesi: ${TimeOfDay.fromDateTime(Hub.supabase.lastSyncTime!.toLocal()).format(context)}${Hub.supabase.isConnected ? '' : ' • Güncelleme hatası'}',
+                  style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
+                ),
+              ),
               // Sabit üst kontrol şeridi: Gurur/Utanç solda sabit, Haftalık/Tüm Zamanlar sağda sabit
               Container(
                 color: Colors.white,
@@ -363,7 +372,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       items: eligible,
       isSelf: (c) => myClanId != null && c.id == myClanId,
     );
-    final out = store.clans.where((c) => !c.isEligibleForRanking).toList();
+    final out = store.serverClans.where((c) => !c.isEligibleForRanking).toList();
 
     return ListView(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
@@ -465,7 +474,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         if (windowItems.isEmpty)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(child: Text('Bu hafta kimse utanç tablosunda değil. 🎉')),
+            child: Center(child: Text('Sunucu listesi boş veya henüz yüklenmedi.')),
           )
         else
           for (final item in windowItems)

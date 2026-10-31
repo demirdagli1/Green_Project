@@ -86,6 +86,11 @@ void main() {
   testWidgets('gezinme: sıralama, utanç tablosu maskeli, mağaza, admin, geri tuşu', (t) async {
     final store = await boot(t);
     await onboard(t, store);
+    store.isServerShameLoaded = true;
+    store.serverShameUsers = store.demoUsers.where((u) => u.weeklyCarTaxiTrips > 0).toList()
+      ..sort((a, b) => b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg));
+    store.serverClans = List.of(store.clans);
+    store.commitDirect();
     await t.tap(find.byTooltip('Sıralama'));
     await t.pumpAndSettle();
     expect(find.text('🏆 Gurur Tablosu'), findsOneWidget);

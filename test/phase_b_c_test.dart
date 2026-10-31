@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:green_project/core/utils/name_masker.dart';
 import 'package:green_project/models/clan.dart';
+import 'package:green_project/models/app_user.dart';
+import 'package:green_project/screens/clan/clan_detail_screen.dart';
 import 'package:green_project/screens/leaderboard/leaderboard_screen.dart';
 import 'package:green_project/screens/main_shell.dart';
 import 'package:green_project/services/app_store.dart';
@@ -13,6 +15,19 @@ import 'package:green_project/services/storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  testWidgets('Klan ayrıntısı üyeleri yalnız sunucu listesinden gösterir', (tester) async {
+    final store = AppStore(backend: MemoryStore());
+    await store.load();
+    store.register(deviceId: 'local', name: 'Yerel Kişi', clanName: 'KTÜ Kanuni');
+    final clan = store.myClan!;
+    store.serverClans = [clan];
+    store.serverUsers = [AppUser(id: 'server', deviceId: 'server', username: 'Sunucu Kişi',
+      clanId: clan.id, clanName: clan.name)];
+    AppStore.instance = store;
+    await tester.pumpWidget(MaterialApp(home: ClanDetailScreen(clan: clan)));
+    expect(find.textContaining('Sunucu Kişi'), findsOneWidget);
+    expect(find.textContaining('Yerel Kişi'), findsNothing);
+  });
   group('Aşama B & C İş Mantığı ve Kalıcılık Testleri', () {
     test('Klan hibrit puanı: 0.6×toplam + 0.4×50×üye ortalaması; haftalık ve tüm zamanlar ayrımı', () {
       // 10 üye, 1000 puan
@@ -186,6 +201,8 @@ void main() {
       final store = AppStore(backend: MemoryStore(), clock: () => DateTime.utc(2026, 10, 26, 9));
       await store.load();
       store.register(deviceId: 'dev_ui2', name: 'Mehmet', clanName: 'KTÜ Kanuni');
+      store.serverClans = List.of(store.clans);
+      store.serverUsers = [store.me!];
       AppStore.instance = store;
       Hub.sensors = SensorController(bridge: NoHardwareBridge(), store: store);
 

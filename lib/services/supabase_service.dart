@@ -29,6 +29,7 @@ abstract class SupabaseGateway {
   Future<List<Map<String, dynamic>>> queryTableOrView(
     String name, {
     int? limit,
+    int offset = 0,
     String? orderBy,
     bool ascending = false,
   });
@@ -64,6 +65,7 @@ class LiveSupabaseGateway implements SupabaseGateway {
   Future<List<Map<String, dynamic>>> queryTableOrView(
     String name, {
     int? limit,
+    int offset = 0,
     String? orderBy,
     bool ascending = false,
   }) async {
@@ -72,7 +74,7 @@ class LiveSupabaseGateway implements SupabaseGateway {
       query = query.order(orderBy, ascending: ascending);
     }
     if (limit != null) {
-      query = query.limit(limit);
+      query = query.range(offset, offset + limit - 1);
     }
     final dynamic res = await query;
     if (res is List) {
@@ -118,7 +120,13 @@ class SupabaseService extends ChangeNotifier {
   String? _lastError;
   bool _isInitialSyncDone = false;
   DateTime? _lastSyncTime;
-  bool _isEchoSuppressed = false;
+  final Duration _shameRefreshInterval;
+  Timer? _shameRefreshTimer;
+  int _shameFetchGeneration = 0;
+  int _profileFetchGeneration = 0;
+  int _leaderboardFetchGeneration = 0;
+  bool _disposed = false;
+  bool _periodicRefreshRunning = false;
 
   SupabaseSyncStatus get status => _status;
   String? get lastError => _lastError;
@@ -131,9 +139,11 @@ class SupabaseService extends ChangeNotifier {
   bool get isConfigured => _gateway != null;
   String? get currentUserId => _gateway?.currentUser?.id;
 
-  SupabaseService({SupabaseGateway? gateway, SupabaseOutbox? outbox})
+  SupabaseService({SupabaseGateway? gateway, SupabaseOutbox? outbox,
+      Duration shameRefreshInterval = const Duration(seconds: 15)})
       : _gateway = gateway,
-        _outbox = outbox;
+        _outbox = outbox,
+        _shameRefreshInterval = shameRefreshInterval;
 
   /// Supabase SDK'yı başlatır (canlıda Supabase.initialize çağırır).
   Future<void> initialize({KeyValueStore? storage}) async {
@@ -288,6 +298,17 @@ class SupabaseService extends ChangeNotifier {
     if (gw == null) return;
 
     _shameDebounceTimer?.cancel();
+    _shameRefreshTimer?.cancel();
+    // Realtime kullanıcı olayları eksik gelebilir; ortak görünümü periyodik yenile.
+    _shameRefreshTimer = Timer.periodic(_shameRefreshInterval, (_) async {
+      if (_periodicRefreshRunning) return;
+      _periodicRefreshRunning = true;
+      try {
+        await fetchServerLeaderboard(store);
+      } finally {
+        _periodicRefreshRunning = false;
+      }
+    });
 
     // Önceki aboneliği temizle (Abonelik sızıntısını önler)
     if (_realtimeChannel != null) {
@@ -322,6 +343,7 @@ class SupabaseService extends ChangeNotifier {
         schema: 'public',
         table: 'clans',
         callback: (payload) {
+          scheduleShameRefresh(store);
           final rec = payload.newRecord;
           final clanSqlId = (rec['id'] as num).toInt();
           final dartClanId = Clan.sqlToId(clanSqlId);
@@ -344,71 +366,8 @@ class SupabaseService extends ChangeNotifier {
         schema: 'public',
         table: 'users',
         callback: (payload) {
-          final rec = payload.newRecord;
-          final uid = rec['id'] as String?;
-          if (uid == null) return;
+          scheduleShameRefresh(store);
 
-          // Remote echo engeli: kendi oturumumuzun olayıysa yerel observer döngüsü başlatma
-          if (uid == store.me?.serverUserId) {
-            _isEchoSuppressed = true;
-            try {
-              store.me = store.me!.copyWith(
-                weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? store.me!.weeklyPoints,
-                goldCoins: (rec['gold_coins'] as num?)?.toInt() ?? store.me!.goldCoins,
-                todaySteps: (rec['today_steps'] as num?)?.toInt() ?? store.me!.todaySteps,
-                weeklyCarTaxiTrips: (rec['weekly_car_taxi_trips'] as num?)?.toInt() ?? store.me!.weeklyCarTaxiTrips,
-                weeklyWastedCo2Kg: (rec['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? store.me!.weeklyWastedCo2Kg,
-              );
-              if (rec['today_steps'] != null) {
-                store.dayRewardedThousands = (rec['today_steps'] as num).toInt() ~/ 1000;
-              }
-              store.commitDirect();
-            } finally {
-              _isEchoSuppressed = false;
-            }
-          } else {
-            // Canlı diğer kullanıcı güncellemeleri (hibiscus vb.)
-            final idx = store.serverUsers.indexWhere((u) => (u.serverUserId ?? u.id) == uid);
-            if (idx >= 0) {
-              final old = store.serverUsers[idx];
-              store.serverUsers[idx] = old.copyWith(
-                weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? old.weeklyPoints,
-                allTimePoints: (rec['all_time_points'] as num?)?.toInt() ?? old.allTimePoints,
-                todaySteps: (rec['today_steps'] as num?)?.toInt() ?? old.todaySteps,
-                weeklyCarTaxiTrips: (rec['weekly_car_taxi_trips'] as num?)?.toInt() ?? old.weeklyCarTaxiTrips,
-                weeklyWastedCo2Kg: (rec['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? old.weeklyWastedCo2Kg,
-                username: rec['nickname'] as String? ?? old.username,
-                equippedAvatar: rec['avatar_url'] as String? ?? old.equippedAvatar,
-                equippedPet: rec['pet_slug'] as String? ?? old.equippedPet,
-                equippedFrame: rec['frame_slug'] as String? ?? old.equippedFrame,
-              );
-            } else {
-              final rawClan = (rec['clan_id'] as num?)?.toInt();
-              store.serverUsers.add(AppUser(
-                id: uid,
-                deviceId: 'SRV-$uid',
-                serverUserId: uid,
-                username: rec['nickname'] as String? ?? 'Gezgin',
-                clanId: rawClan != null ? Clan.sqlToId(rawClan) : '',
-                clanName: '',
-                isDemo: false,
-                todaySteps: (rec['today_steps'] as num?)?.toInt() ?? 0,
-                weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? 0,
-                allTimePoints: (rec['all_time_points'] as num?)?.toInt() ?? 0,
-                streakDays: (rec['streak_days'] as num?)?.toInt() ?? 0,
-                weeklyCarTaxiTrips: (rec['weekly_car_taxi_trips'] as num?)?.toInt() ?? 0,
-                weeklyWastedCo2Kg: (rec['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? 0.0,
-                equippedAvatar: rec['avatar_url'] as String? ?? 'default_avatar',
-                equippedFrame: rec['frame_slug'] as String? ?? 'none',
-                equippedPet: rec['pet_slug'] as String? ?? 'none',
-                clanRole: rec['clan_role'] as String? ?? 'member',
-              ));
-            }
-            store.commitDirect();
-          }
-
-          // Realtime kullanıcı güncellemelerinde utanç listesini debounce ile güvenle yenile
-          _scheduleShameRefresh(store);
         },
       );
 
@@ -440,7 +399,9 @@ class SupabaseService extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
     _shameDebounceTimer?.cancel();
+    _shameRefreshTimer?.cancel();
     if (_realtimeChannel != null) {
       _gateway?.removeChannel(_realtimeChannel!);
       _realtimeChannel = null;
@@ -449,7 +410,8 @@ class SupabaseService extends ChangeNotifier {
     super.dispose();
   }
 
-  void _scheduleShameRefresh(AppStore store) {
+  @visibleForTesting
+  void scheduleShameRefresh(AppStore store) {
     _shameDebounceTimer?.cancel();
     _shameDebounceTimer = Timer(const Duration(milliseconds: 300), () {
       fetchServerShameBoard(store);
@@ -460,14 +422,10 @@ class SupabaseService extends ChangeNotifier {
   /// Puan top50'si dışındakiler dahil ortak evren; başarılı boş snapshot'ta da isServerShameLoaded = true set edilir.
   Future<bool> fetchServerShameBoard(AppStore store) async {
     final gw = _gateway;
-    if (gw == null) return false;
+    if (gw == null || _disposed) return false;
+    final generation = ++_shameFetchGeneration;
     try {
-      final shameRows = await gw.queryTableOrView(
-        'v_global_shame_board',
-        limit: 50,
-        orderBy: 'global_shame_rank',
-        ascending: true,
-      );
+      final shameRows = await _fetchAll(gw, 'v_global_shame_board', 'user_id');
       final shameUsers = <AppUser>[];
       for (final row in shameRows) {
         final uid = row['user_id'] as String;
@@ -484,6 +442,15 @@ class SupabaseService extends ChangeNotifier {
           equippedAvatar: row['avatar_url'] as String? ?? 'default_avatar',
         ));
       }
+      shameUsers.sort((a, b) {
+        final wasted = b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg);
+        if (wasted != 0) return wasted;
+        final trips = b.weeklyCarTaxiTrips.compareTo(a.weeklyCarTaxiTrips);
+        return trips != 0 ? trips : a.id.compareTo(b.id);
+      });
+      if (_disposed) return false;
+      // Daha yeni bir sorgu başladıysa eski yanıt snapshot'ı geri almasın.
+      if (generation != _shameFetchGeneration) return true;
       store.serverShameUsers = shameUsers;
       store.isServerShameLoaded = true;
       store.commitDirect();
@@ -494,10 +461,62 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Future<List<Map<String, dynamic>>> _fetchAll(SupabaseGateway gw, String view, String id) async {
+    const pageSize = 500;
+    final rows = <Map<String, dynamic>>[];
+    for (var offset = 0;; offset += pageSize) {
+      final page = await gw.queryTableOrView(view, limit: pageSize, offset: offset, orderBy: id, ascending: true);
+      rows.addAll(page);
+      if (page.length < pageSize) return rows;
+    }
+  }
+
+  Future<bool> fetchServerProfile(AppStore store) async {
+    final gw = _gateway;
+    final local = store.me;
+    if (gw == null || local?.serverUserId == null || _disposed) return false;
+    final generation = ++_profileFetchGeneration;
+    try {
+      final result = await gw.rpc('rpc_get_my_profile');
+      if (result is! Map || result['ok'] != true || result['user'] is! Map) return false;
+      final row = Map<String, dynamic>.from(result['user'] as Map);
+      if (row['id'] != local!.serverUserId || store.me?.serverUserId != local.serverUserId) return false;
+      if (_disposed || generation != _profileFetchGeneration) return true;
+      final clan = result['clan'] is Map ? result['clan'] as Map : null;
+      final clanId = (row['clan_id'] as num?)?.toInt();
+      store.serverProfile = local.copyWith(
+        username: row['nickname'] as String? ?? '',
+        clanId: clanId == null ? '' : Clan.sqlToId(clanId),
+        clanName: clan?['name'] as String? ?? '',
+        todaySteps: (row['today_steps'] as num?)?.toInt() ?? 0,
+        weeklyPoints: (row['weekly_points'] as num?)?.toInt() ?? 0,
+        allTimePoints: (row['all_time_points'] as num?)?.toInt() ?? 0,
+        goldCoins: (row['gold_coins'] as num?)?.toInt() ?? 0,
+        streakDays: (row['streak_days'] as num?)?.toInt() ?? 0,
+        preventedCo2Kg: (row['weekly_saved_co2_kg'] as num?)?.toDouble() ?? 0,
+        weeklyCarTaxiTrips: (row['weekly_car_taxi_trips'] as num?)?.toInt() ?? 0,
+        weeklyWastedCo2Kg: (row['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? 0,
+        bio: row['bio'] as String? ?? '',
+        equippedAvatar: row['avatar_url'] as String? ?? 'default_avatar',
+        equippedFrame: row['frame_slug'] as String? ?? 'none',
+        equippedPet: row['pet_slug'] as String? ?? 'none',
+      );
+      store.commitDirect();
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] Profil yenilenemedi: $e');
+      return false;
+    }
+  }
+
   /// Sunucudan Canlı Liderlik Verisini Çeker (Görünümler Üzerinden).
   Future<bool> fetchServerLeaderboard(AppStore store) async {
     final gw = _gateway;
-    if (gw == null) return false;
+    if (gw == null || _disposed) return false;
+    final generation = ++_leaderboardFetchGeneration;
+
+    final profileNeeded = store.me?.serverUserId != null;
+    final profileOk = !profileNeeded || await fetchServerProfile(store);
 
     // 1. Utanç panosu snapshot'ını klan veya diğer sorguların hatasından BAĞIMSIZ olarak yenile
     final shameOk = await fetchServerShameBoard(store);
@@ -506,19 +525,13 @@ class SupabaseService extends ChangeNotifier {
 
     // 2. Kullanıcılar lider tablosu
     try {
-      final userRows = await gw.queryTableOrView(
-        'v_leaderboard_users',
-        limit: 50,
-        orderBy: 'weekly_points',
-        ascending: false,
-      );
+      final userRows = await _fetchAll(gw, 'v_leaderboard_users', 'user_id');
 
-      if (userRows.isNotEmpty) {
+      {
         final serverUsers = <AppUser>[];
         for (final row in userRows) {
           final uid = row['user_id'] as String;
-          final isMe = uid == store.me?.serverUserId;
-          if (!isMe) {
+          {
             final rawClan = (row['clan_id'] as num?)?.toInt();
             serverUsers.add(AppUser(
               id: uid,
@@ -540,18 +553,13 @@ class SupabaseService extends ChangeNotifier {
               equippedPet: row['pet_slug'] as String? ?? 'none',
               clanRole: row['clan_role'] as String? ?? 'member',
             ));
-          } else if (store.me != null) {
-            store.me = store.me!.copyWith(
-              weeklyPoints: (row['weekly_points'] as num?)?.toInt() ?? store.me!.weeklyPoints,
-              allTimePoints: (row['all_time_points'] as num?)?.toInt() ?? store.me!.allTimePoints,
-              todaySteps: (row['today_steps'] as num?)?.toInt() ?? store.me!.todaySteps,
-              weeklyCarTaxiTrips: (row['weekly_car_taxi_trips'] as num?)?.toInt() ?? store.me!.weeklyCarTaxiTrips,
-              weeklyWastedCo2Kg: (row['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? store.me!.weeklyWastedCo2Kg,
-            );
           }
+
         }
-        store.serverUsers = serverUsers;
-        store.commitDirect();
+        if (!_disposed && generation == _leaderboardFetchGeneration) {
+          store.serverUsers = serverUsers;
+          store.commitDirect();
+        }
       }
       usersOk = true;
     } catch (e) {
@@ -560,40 +568,37 @@ class SupabaseService extends ChangeNotifier {
 
     // 3. Klanlar lider tablosu
     try {
-      final clanRows = await gw.queryTableOrView(
-        'v_clan_leaderboard',
-        limit: 20,
-        orderBy: 'weekly_points',
-        ascending: false,
-      );
+      final clanRows = await _fetchAll(gw, 'v_clan_leaderboard', 'clan_id');
 
-      if (clanRows.isNotEmpty) {
+      {
+        final serverClans = <Clan>[];
         for (final row in clanRows) {
           final sqlId = (row['clan_id'] as num).toInt();
           final dartId = Clan.sqlToId(sqlId);
-          final idx = store.clans.indexWhere((c) => c.id == dartId);
-          if (idx >= 0) {
-            store.clans[idx] = store.clans[idx].copyWith(
-              weeklyPoints: (row['weekly_points'] as num?)?.toInt() ?? store.clans[idx].weeklyPoints,
-              allTimePoints: (row['all_time_points'] as num?)?.toInt() ?? store.clans[idx].allTimePoints,
-              memberCount: (row['member_count'] as num?)?.toInt() ?? store.clans[idx].memberCount,
-            );
-          }
+          serverClans.add(Clan(id: dartId, name: row['clan_name'] as String? ?? '',
+            memberCount: (row['member_count'] as num?)?.toInt() ?? 0,
+            weeklyPoints: (row['weekly_points'] as num?)?.toInt() ?? 0,
+            allTimePoints: (row['all_time_points'] as num?)?.toInt() ?? 0,
+            weeklyWastedCo2Kg: (row['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? 0));
         }
-        store.commitDirect();
+        if (!_disposed && generation == _leaderboardFetchGeneration) {
+          store.serverClans = serverClans;
+          store.commitDirect();
+        }
       }
       clansOk = true;
     } catch (e) {
       debugPrint('[SupabaseService] v_clan_leaderboard çekme hatası: $e');
     }
 
-    final allOk = shameOk && usersOk && clansOk;
+    final allOk = shameOk && usersOk && clansOk && profileOk;
+    if (_disposed || generation != _leaderboardFetchGeneration) return allOk;
     if (allOk) {
       _lastSyncTime = DateTime.now();
       _lastError = null;
       _status = SupabaseSyncStatus.connected;
     } else {
-      _lastError = (shameOk || usersOk || clansOk)
+      _lastError = (shameOk || usersOk || clansOk || (profileNeeded && profileOk))
           ? 'Liderlik verileri kısmen güncellenemedi.'
           : 'Liderlik verileri güncellenemedi.';
       _status = SupabaseSyncStatus.error;
@@ -719,7 +724,6 @@ class SupabaseService extends ChangeNotifier {
     required double co2SavedKg,
     String? eventId,
   }) async {
-    if (_isEchoSuppressed) return;
     await _outbox?.enqueue(
       actionType: 'record_steps',
       eventId: eventId,
@@ -741,7 +745,6 @@ class SupabaseService extends ChangeNotifier {
     required double co2SavedKg,
     String? eventId,
   }) async {
-    if (_isEchoSuppressed) return;
     await _outbox?.enqueue(
       actionType: 'record_transit',
       eventId: eventId,
@@ -765,7 +768,6 @@ class SupabaseService extends ChangeNotifier {
     required bool isSpoof,
     String? rejectReason,
   }) async {
-    if (_isEchoSuppressed) return;
     await _outbox?.enqueue(
       actionType: 'record_bike',
       eventId: tripId,
@@ -790,7 +792,6 @@ class SupabaseService extends ChangeNotifier {
     required double wastedCo2Kg,
     required double avgSpeedKmh,
   }) async {
-    if (_isEchoSuppressed) return;
     await _outbox?.enqueue(
       actionType: 'record_vehicle_penalty',
       eventId: tripId,
@@ -866,7 +867,6 @@ class SupabaseService extends ChangeNotifier {
     required bool isShortPenalty,
     String? explanation,
   }) async {
-    if (_isEchoSuppressed) return;
     await _outbox?.enqueue(
       actionType: 'record_bus_trip',
       eventId: eventId,

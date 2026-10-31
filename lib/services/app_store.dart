@@ -91,6 +91,8 @@ class AppStore extends ChangeNotifier {
   List<AppUser> demoUsers = List.of(DemoData.users());
   List<Clan> clans = List.of(DemoData.clans());
   List<AppUser> serverUsers = [];
+  List<Clan> serverClans = [];
+  AppUser? serverProfile;
   List<AppUser> serverShameUsers = [];
   bool isServerShameLoaded = false;
   final Set<String> owned = {'default_avatar'};
@@ -1129,27 +1131,7 @@ class AppStore extends ChangeNotifier {
   }
 
   List<AppUser> rankedUsers({bool allTime = false}) {
-    final Map<String, AppUser> deduped = {};
-
-    // 1. Canlı sunucu kullanıcıları
-    for (final su in serverUsers) {
-      deduped[su.serverUserId ?? su.id] = su;
-    }
-
-    // 2. Demo kullanıcıları (Sunucu verisi yoksa veya demo kayıtları)
-    for (final du in demoUsers) {
-      if (!deduped.containsKey(du.id)) {
-        deduped[du.id] = du;
-      }
-    }
-
-    // 3. Kendi profilimiz (Sunucu ID'si veya yerel ID ile tekil olarak ekle)
-    if (me != null) {
-      final myKey = me!.serverUserId ?? me!.id;
-      deduped[myKey] = me!;
-    }
-
-    final l = deduped.values.toList();
+    final l = List<AppUser>.of(serverUsers);
     l.sort((a, b) {
       final c = allTime ? b.allTimePoints.compareTo(a.allTimePoints) : b.weeklyPoints.compareTo(a.weeklyPoints);
       if (c != 0) return c;
@@ -1160,39 +1142,14 @@ class AppStore extends ChangeNotifier {
   }
 
   List<Clan> rankedClans({bool hybrid = true, bool allTime = false}) =>
-      clans.where((c) => c.isEligibleForRanking).toList()..sort((a, b) => compareClans(a, b, hybrid: hybrid, allTime: allTime));
+      serverClans.where((c) => c.isEligibleForRanking).toList()..sort((a, b) => compareClans(a, b, hybrid: hybrid, allTime: allTime));
 
-  /// Klan Utanç Listesi: En çok israf yapan klanlar deterministik sıralanır.
   List<Clan> worstClans() {
-    final Map<String, double> wastedByClan = {};
-    for (final u in serverUsers) {
-      if (u.clanId.isNotEmpty && u.weeklyWastedCo2Kg > 0) {
-        wastedByClan[u.clanId] = (wastedByClan[u.clanId] ?? 0.0) + u.weeklyWastedCo2Kg;
-      }
-    }
-    for (final du in demoUsers) {
-      if (du.clanId.isNotEmpty && du.weeklyWastedCo2Kg > 0) {
-        wastedByClan[du.clanId] = (wastedByClan[du.clanId] ?? 0.0) + du.weeklyWastedCo2Kg;
-      }
-    }
-    if (me != null && me!.clanId.isNotEmpty && me!.weeklyWastedCo2Kg > 0) {
-      wastedByClan[me!.clanId] = (wastedByClan[me!.clanId] ?? 0.0) + me!.weeklyWastedCo2Kg;
-    }
-
-    final list = clans.map((c) {
-      final totalWasted = max(c.weeklyWastedCo2Kg, wastedByClan[c.id] ?? 0.0);
-      return c.copyWith(weeklyWastedCo2Kg: totalWasted);
-    }).toList();
-
+    final list = List<Clan>.of(serverClans);
     list.sort((a, b) {
-      final w = b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg);
-      if (w != 0) return w;
-      final p = a.weeklyPoints.compareTo(b.weeklyPoints);
-      if (p != 0) return p;
-      final n = a.name.compareTo(b.name);
-      return n != 0 ? n : a.id.compareTo(b.id);
+      final wasted = b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg);
+      return wasted != 0 ? wasted : a.id.compareTo(b.id);
     });
-
     return list;
   }
 
@@ -1204,31 +1161,7 @@ class AppStore extends ChangeNotifier {
       return List<AppUser>.unmodifiable(serverShameUsers);
     }
 
-    // 2. Çevrimiçi/oturum açık ancak sunucu utanç listesi henüz yüklenmediyse veya başarısız olduysa:
-    //    Demo verilerini gerçek sunucu kullanıcısıymış gibi gösterme, boş liste dön.
-    if (serverUsers.isNotEmpty || (me != null && me!.serverUserId != null)) {
-      return const [];
-    }
-
-    // 3. Saf çevrimdışı / demo durumu fallback (yalnız yerel demo profilinde)
-    final Map<String, AppUser> deduped = {};
-    for (final du in demoUsers) {
-      if (du.weeklyCarTaxiTrips > 0 && du.weeklyWastedCo2Kg > 0) {
-        deduped[du.id] = du;
-      }
-    }
-    if (me != null && me!.weeklyCarTaxiTrips > 0 && me!.weeklyWastedCo2Kg > 0) {
-      deduped[me!.id] = me!;
-    }
-    final l = deduped.values.toList();
-    l.sort((a, b) {
-      final c = b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg);
-      if (c != 0) return c;
-      final t = b.weeklyCarTaxiTrips.compareTo(a.weeklyCarTaxiTrips);
-      if (t != 0) return t;
-      return a.id.compareTo(b.id);
-    });
-    return l;
+    return const [];
   }
 
   Clan? get myClan {
@@ -1236,6 +1169,14 @@ class AppStore extends ChangeNotifier {
     if (u == null) return null;
     final i = clans.indexWhere((c) => c.id == u.clanId);
     return i < 0 ? null : clans[i];
+  }
+
+  Clan? get serverMyClan {
+    final clanId = serverProfile?.clanId ?? me?.clanId;
+    for (final clan in serverClans) {
+      if (clan.id == clanId) return clan;
+    }
+    return null;
   }
 
   /// Admin/demo bildirimi (yalnızca bu cihaza; cihazlar arası değil).

@@ -413,6 +413,8 @@ void main() {
     test('eşit puanda kararlı sıra (ad, sonra id); sıralama dışı klan hariç', () async {
       final e = Env();
       final s = await e.fresh();
+      s.serverClans = List.of(s.clans);
+      s.serverUsers = List.of(s.demoUsers);
       final ranked = s.rankedClans();
       expect(ranked.any((c) => c.id == 'clan_micro'), false);
       expect(ranked.first.id, 'clan_ktu_kanuni');
@@ -425,17 +427,21 @@ void main() {
     test('utanç tablosu: israf CO₂ azalan; cezasızlar hariç', () async {
       final e = Env();
       final s = await e.fresh();
+      s.serverShameUsers = s.demoUsers.where((u) => u.weeklyCarTaxiTrips > 0).toList()
+        ..sort((a, b) => b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg));
+      s.isServerShameLoaded = true;
       final board = s.shameBoard();
       expect(board.first.username, 'Pelinsu Yılmaz');
       expect(board.every((u) => u.weeklyCarTaxiTrips > 0), true);
       s.evaluateVehicle(tripId: 'z', avgSpeedKmh: 70, distanceKm: 300, stepDelta: 0, demo: true);
-      expect(s.shameBoard().first.id, s.me!.id);
+      expect(s.shameBoard().first.id, board.first.id);
     });
     test('tüm zamanlar ve haftalık ayrımı reset sonrası', () async {
       final e = Env();
       final s = await e.fresh();
       s.demoAddSteps(2000);
       s.settleWeek(s.weekId);
+      s.serverUsers = [s.me!];
       expect(s.rankedUsers().firstWhere((u) => u.id == s.me!.id).weeklyPoints, 0);
       expect(s.rankedUsers(allTime: true).firstWhere((u) => u.id == s.me!.id).allTimePoints, 10);
     });
