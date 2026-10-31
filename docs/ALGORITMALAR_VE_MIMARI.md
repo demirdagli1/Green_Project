@@ -108,16 +108,11 @@ Telefon cebinizdeyken ne yaptığınızı anlamak için 3 sensör metriği çapr
 
 ---
 
-## 5. Toplu Taşıma, QR/NFC ve 45 Dakika Kuralı
+## 5. Toplu Taşıma: Güncel Durum
 
-Toplu taşıma binişleri karekod (QR) veya NFC etiketleri okutularak sisteme işlenir:
+QR/NFC okutma ekranı kullanıcının isteğiyle kaldırıldı. Alt menü Ana Sayfa, Sıralamalar ve Profil'den oluşur. Eski durak kodu ve 45 dakika kontrolü sunucu geçmişinde bulunur; güncel uygulamada kullanıcıya açık bir okutma akışı yoktur.
 
-* **Durak Doğrulama:** Okutulan metin `YESILADIM://TRANSIT/<DURAK_KODU>` kalıbına uygun olmalıdır.
-* **45 Dakika Kuralı:** Aynı durak veya aynı hat üzerinde 45 dakika içinde tekrar okutma yapılırsa sistem puan vermez:  
-  * 44 dakika 59 saniye sonra okutulursa: **Reddedilir** ("Sonraki biniş için bekleyin").
-  * 45 dakika 00 saniye sonra okutulursa: **Onaylanır (+3 Puan)**.
-* **Aynı Olayın Tekrar Gelmesi (Retry):** İnternet gidip geldiğinde telefon aynı biniş isteğini iki kez sunucuya gönderirse ne olur? Her biniş isteğine benzersiz bir işlem kimliği (`eventId`) verilir. Sunucu bu kimliği `processed_events` tablosunda saklar. İkinci istek geldiğinde veritabanı "Ben bu işlemi zaten yaptım" der ve Ayşe'ye ikinci kez puan vermez.
-* **Yerel Kural vs. Sunucu Kuralı:** Yerel kural ([app_store.dart](../lib/services/app_store.dart)) kullanıcının ekranında anında uyarı çıkması için çalışır. Asıl yetkili olan ise sunucudaki Postgres kilididir ([07_delivery.sql](../supabase/migrations/07_delivery.sql)); istemci hacklense bile sunucu kuralı aşamaz.
+Bir durak kodu gerçek binişi veya gidilen mesafeyi kanıtlamaz. Otobüs doğrulamasının sensör verisiyle tamamlanması bekleniyor. Aynı olayın internet kesintisi nedeniyle yeniden gönderilmesinde ikinci ödülü önleme kuralı diğer sunucu işlemlerinde de geçerlidir.
 
 ---
 
@@ -134,11 +129,10 @@ Kullanıcı motorlu araca bindiğinde sistem 0 ile 100 arasında bir olasılık 
 * Durakta iniş: **+20 puan**
 * **Karar Sınırı:** Toplam skor **≥ 60** ise otobüs kabul edilir (+3 Puan). Skor **< 60** ise özel araç/taksi kabul edilir (Utanç Tablosu).
 
-### Kısa Mesafe Kuralı (≤ 500 Metre)
-Otobüs doğrulansa bile gidilen mesafe 500 metreden azsa yürünebilecek bir mesafe araçla gidildiği için ceza uygulanır:
-* Eğer kullanıcı binişte QR okutmamışsa: **-3 puan** ceza uygulanır.
-* Eğer kullanıcı binişte QR okutup +3 puan almışsa: Verilen 3 puan geri alınır ve üstüne 3 puan ceza kesilir (kullanıcıdan net **-6 puan** düşülür ve kazanılan CO₂ tasarrufu iptal edilir) ([app_store.dart](../lib/services/app_store.dart#L681-L710)).
-* **Sistem Riskleri:** Tünellerde GPS'in kesilmesi, kırmızı ışıkta bekleyen taksinin durak sanılması veya hiç durmadan giden ekspres otobüs hatları algoritmanın en hassas sınır noktalarıdır.
+### Kısa Mesafe Kuralı (Taslak: 0 < mesafe ≤ 500 Metre)
+Doğrulanmış kısa otobüs yolculuğu için kararlaştırılan ceza 3 puandır; ödül verilmez. **Bu kural ana sunucuda henüz etkin değildir.** Otomatik yolculuk doğrulaması tamamlanmadan mesafeye bakıp ceza kesilmez. QR okutmaya dayalı önceki anlatım güncel gereksinim değildir.
+
+Tünelde GPS kaybı, kırmızı ışıkta bekleyen taksi ve ekspres otobüs yanlış ayrım riski taşır. Yetersiz veriyi kesin araba kullanımı saymak doğru değildir; yukarıdaki skorlar tasarımın açıklamasıdır, gerçek yolculuk doğruluğunun kanıtı değildir.
 
 ---
 
@@ -234,12 +228,12 @@ Projeyi incelerken hangi mantığın nerede olduğunu bulabileceğiniz hızlı r
    *Çünkü adım kadansı dakikada 185'in üzerine çıkar ve GPS konum değişimi 3 metrenin altında kalır. Kural motoru bunu hile sayar.*
 2. **Sabah 999 adım attım, neden ekranda 0 puan yazıyor?**  
    *Puan ödülü her tamamlanan 1.000 adımda bir (+5) tetiklenir.*
-3. **Aynı otobüse binerken arka arkaya iki kez QR okutursam ne olur?**  
-   *45 dakikalık durak bekleme süresi devrededir; ikinci tarama reddedilir.*
+3. **QR/NFC okutma nerede?**  
+   *Güncel uygulamadan kaldırıldı. Otobüs için otomatik doğrulama üzerinde çalışılıyor.*
 4. **Bisikletle saatte 55 km hız yaparsam ne olur?**  
    *Maksimum bisiklet eşiği olan 48 km/sa aşıldığı için sürüş geçersiz sayılır ve puan verilmez.*
 5. **Otobüsle sadece 300 metre gidersem ne kazanırım?**  
-   *Kısa mesafe kuralı gereği hiçbir şey kazanamazsınız; aksine -3 puan ceza kesilir.*
+   *Planlanan kural ödül vermemek ve 3 puan kesmektir; ana sunucuda henüz etkin değildir.*
 6. **Telefonum kapandı açıldı, adımlarım sıfırlandı; hile cezası yer miyim?**  
    *Hayır, sayaç yeniden başlatması yakalanır ve taban çizgi sessizce güncellenir.*
 7. **Klanımız 4 kişi ve 10.000 puan topladık; liderlikte neden görünmüyoruz?**  
