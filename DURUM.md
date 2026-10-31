@@ -112,3 +112,8 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - Ana sayfa ve profil, sunucuya bağlı kullanıcı için yetkili `rpc_get_my_profile` snapshot'ını, ana sayfa klanı ise sunucu klan listesini gösterir. Yerel bekleyen adımlar bu görüntüyü değiştirmez veya profil yenilemesiyle silinmez; profil alınana dek bekleme mesajı gösterilir.
 - Tam çevrimdışı test paketi 141/141 başarılı; son klan ayrıntısı değişikliği ardından ilgili 26/26 test ve Dart analizi başarılı. Realtime olayı gelmediğinde sıralamanın yenilenmesi, boş snapshot, 501 kullanıcılık sayfalama ve profil/yerel bekleyen durum ayrımı test edildi. İki fiziksel cihazda canlı sonuç ve bildirim henüz kullanıcı tarafından doğrulanmadı.
 - Son çevrimdışı Gradle derlemesi başarılı. `releases/YeSilAdim-debug.apk`: 173.963.065 bayt; SHA-256 `4d64035239185146d18f2c8e6499911df764688d75bb637eddb2106f450217e0`; checksum doğrulandı. Bu APK'nın kurulumu root tarafından yürütülür; yukarıdaki kurulum önceki APK'ya aittir.
+
+## Son cihaz teslimi
+- `e349e1e`: ortak listeler yalnız Supabase snapshotlarından okunuyor; demo/yerel me karışımı kaldırıldı. Tam141 ve son26 hedefli test geçti.
+- Aynı son APK bağlı iki telefona adb install --no-streaming -r ile başarıyla yüklendi ve MainActivity açıldı. Kullanıcının elle iki ekran karşılaştırması bekleniyor; kurulum, eşzamanlı veri doğruluğu testi değildir.
+- PC panelindeki seçili kullanıcı/yenileme tutarlılığı AGY ayrı görevidir; yalnız tools/universal_gm/index.html düzenleniyor.
