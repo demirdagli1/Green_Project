@@ -178,6 +178,21 @@
             </button>
           </div>
 
+          <!-- UTANÇ TABLOSU ARAÇ/TAKSİ CEZASI EKLEME -->
+          <label>🚗 Araba / Taksi Cezası Ekle (Utanç Tablosuna Canlı İşleme Testi)</label>
+          <div class="action-row">
+            <input type="number" id="inVehicleKm" value="8.5" step="0.5" min="0.1" max="500" placeholder="Mesafe (km)" style="width: 140px;">
+            <button class="btn-danger gm-action-btn" style="flex: 1;" onclick="addVehiclePenalty()">
+              🚗 Araba/Taksi Cezası Ekle (Utanç Tablosuna Yaz)
+            </button>
+          </div>
+
+          <label>📣 Utanç Panosu Yönetici Test Bildirimi</label>
+          <p style="font-size: 12px; color: var(--text-muted);">Seçili gerçek kullanıcıya yönetici test bildirimi gönderir. Bu, oyuncunun 10 altınlık ve günlük 1 adet sınırlı utanç mesajı değildir; altın harcamaz.</p>
+          <div class="action-row">
+            <button class="btn-danger gm-action-btn" style="flex: 1;" onclick="sendShameTestNotification()">📣 Seçili Kullanıcıya Utanç Test Bildirimi Gönder</button>
+          </div>
+
           <!-- RAHATSIZ EDİCİ BİLDİRİM / DÜRTME -->
           <label>🚨 Rahatsız Edici Bildirim / Test Uyarısı (Ses & Titreşim)</label>
           <div class="action-row">
@@ -492,7 +507,9 @@
           const errMsg = data.message || (res.status === 403 || res.status === 400 ? 'Yetkisiz Erişim: Bu hesap veritabanı server_admins tablosunda yetkili değil.' : 'İşlem sunucu tarafından reddedildi.');
           throw new Error(errMsg);
         }
-        showBanner(`İşlem Başarılı: ${action} uygulandı.`, true);
+        showBanner(action === 'send_alert_notification'
+          ? 'Bildirim sunucuya kaydedildi; cihazda teslim henüz doğrulanmadı.'
+          : `İşlem Başarılı: ${action} uygulandı.`, true);
         addAuditEntry(action, 'Başarılı', JSON.stringify(payload));
         loadUsersList();
       } catch (e) {
@@ -507,6 +524,28 @@
       executeAction('send_alert_notification', {
         title: '🚨 Yeşil Adım Yönetici Uyarısı!',
         body: body,
+        severity: 'urgent'
+      });
+    }
+
+    function addVehiclePenalty() {
+      const input = document.getElementById('inVehicleKm').value.trim();
+      const distance = Number(input);
+      if (!input || !Number.isFinite(distance) || distance < 0.1 || distance > 500) {
+        showBanner('Mesafe 0,1 ile 500 km arasında olmalıdır.', false);
+        return;
+      }
+      executeAction('add_vehicle_penalty', { distance_km: distance });
+    }
+
+    function sendShameTestNotification() {
+      if (!selectedUserObj || selectedUserObj.is_demo) {
+        showBanner('Lütfen listeden gerçek bir kullanıcı seçin.', false);
+        return;
+      }
+      executeAction('send_alert_notification', {
+        title: '📣 Utanç Panosu — Yönetici Testi',
+        body: 'Bu bir utanç panosu yönetici test bildirimidir.',
         severity: 'urgent'
       });
     }

@@ -287,7 +287,9 @@ class ShopProfileScreen extends StatelessWidget {
                                     ? 'Supabase: Canlı'
                                     : (sb.status == SupabaseSyncStatus.connecting
                                         ? 'Supabase: Bağlanıyor…'
-                                        : 'Supabase: Çevrimdışı'),
+                                        : (sb.status == SupabaseSyncStatus.error
+                                            ? 'Supabase: Senkronizasyon hatası'
+                                            : 'Supabase: Çevrimdışı')),
                                 style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
                               ),
                               if (sb.outbox != null && sb.outbox!.pendingCount > 0)
@@ -305,7 +307,9 @@ class ShopProfileScreen extends StatelessWidget {
                             ],
                           ),
                           Text(
-                            u.serverUserId != null
+                            sb.status == SupabaseSyncStatus.error && sb.lastError != null
+                                ? sb.lastError!
+                                : u.serverUserId != null
                                 ? 'Anonim Oturum: ${u.serverUserId!.substring(0, 8)}…'
                                 : (sb.lastError ?? 'Canlı bağlantı bekleniyor, yerel önbellek etkin.'),
                             style: TextStyle(

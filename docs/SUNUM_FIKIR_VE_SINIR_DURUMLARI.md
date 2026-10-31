@@ -7,6 +7,8 @@ Bu belge, **Yeşil Adım** projesini ilk kez dinleyecek olan bir jüriye / ders 
 
 ---
 
+> **Son test yolu:** Telefonda demo senaryosu sunucuya ceza yazmaz. Migration 12 canlıya uygulandı; PC GM panelinde kullanıcı seçip “Araba/Taksi Cezası Ekle” ile ortak listeye test kaydı eklenebilir. Ayrı “Utanç Test Bildirimi Gönder” düğmesi yönetici bildirimi yollar; altın harcayan oyuncu mesajından ayrıdır. Yeni APK kuruldu; iki fiziksel cihaz ve bildirim teslimi elle kontrol edilecek.
+
 ## 1. Açık Sözlük (Jargonsuz, Günlük Hayattan Benzetmeler)
 
 Hocanın sunumu dinlerken teknik terminolojiye takılmaması için projede geçen temel kavramların en sade karşılıkları:

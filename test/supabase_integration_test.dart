@@ -13,6 +13,7 @@ class TestMockSupabaseGateway implements SupabaseGateway {
   Session? mockSession;
   int anonymousSignInCalls = 0;
   bool shouldFailNetwork = false;
+  final Set<String> failingViews = {};
 
   final Map<String, dynamic> dbUsers = {};
   final Set<String> processedEvents = {};
@@ -168,7 +169,7 @@ class TestMockSupabaseGateway implements SupabaseGateway {
     String? orderBy,
     bool ascending = false,
   }) async {
-    if (shouldFailNetwork) {
+    if (shouldFailNetwork || failingViews.contains(name)) {
       throw const SocketException('Ağ hatası');
     }
     if (name == 'v_leaderboard_users') {
@@ -476,6 +477,34 @@ void main() {
       final board = store.shameBoard();
       expect(board.length, 1);
       expect(board.first.serverUserId, 'shame-uuid-99');
+    });
+
+    test('Liderlik hataları bağlantıyı başarılı göstermez; utanç verisi bağımsız yenilenir', () async {
+      final gateway = TestMockSupabaseGateway(userId: 'user');
+      final service = SupabaseService(gateway: gateway);
+      gateway.shameBoardRows.add({
+        'user_id': 'target',
+        'masked_name': 'Test***',
+      });
+      gateway.failingViews.add('v_leaderboard_users');
+      expect(await service.fetchServerLeaderboard(store), isFalse);
+      expect(store.serverShameUsers.single.serverUserId, 'target');
+      expect(service.status, SupabaseSyncStatus.error);
+      expect(service.lastError, contains('kısmen'));
+      expect(service.lastSyncTime, isNull);
+
+      gateway.shouldFailNetwork = true;
+      expect(await service.fetchServerLeaderboard(store), isFalse);
+      expect(service.status, SupabaseSyncStatus.error);
+      expect(service.lastError, 'Liderlik verileri güncellenemedi.');
+
+      gateway.shouldFailNetwork = false;
+      gateway.failingViews.clear();
+      expect(await service.fetchServerLeaderboard(store), isTrue);
+      expect(service.status, SupabaseSyncStatus.connected);
+      expect(service.lastError, isNull);
+      expect(service.lastSyncTime, isNotNull);
+      service.dispose();
     });
   });
 }

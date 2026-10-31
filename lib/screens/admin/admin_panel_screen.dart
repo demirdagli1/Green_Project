@@ -73,13 +73,13 @@ class _AdminPanelScreenState extends State<AdminPanelScreen> {
             _btn('[DEMO] 101 otobüs doğrula', 'TRB-BLD-101 kodu: normal cooldown kuralıyla +3 puan.', () {
               _snack(s.scanTransit('YESILADIM://TRANSIT/TRB-BLD-101', source: 'DEMO').message);
             }),
-            _btn('[DEMO] 68 km/sa araba/taksi yakala (İzole Ceza)', 'Deterministik: Transit muafiyetini yoksayar; Utanç Tablosuna +1 ceza ve harcanan CO₂ yazar.', () {
+            _btn('[DEMO] 68 km/sa araba/taksi yakala (İzole Ceza)', '[YEREL DEMO SİMÜLASYONU] Transit muafiyetini yoksayar; yalnızca yerel belleği günceller, ortak sunucu utanç listesini etkilemez (Canlı ceza için PC GM Panelini kullanın).', () {
               final r = s.evaluateVehicle(tripId: _id('demo_taxi_iso'), avgSpeedKmh: 68, distanceKm: 8.5, stepDelta: 0, demo: true, ignoreTransitExemption: true);
-              _snack(r.message);
+              _snack('${r.message} [Yerel Demo: Sunucu utanç listesini etkilemez; canlı kayıt için PC GM Paneli]');
             }),
-            _btn('[DEMO] 68 km/sa taksi (Transit Muafiyetli Test)', 'Toplu taşıma kaydı varsa muaf tutar, yoksa ceza yazar.', () {
+            _btn('[DEMO] 68 km/sa taksi (Transit Muafiyetli Test)', '[YEREL DEMO SİMÜLASYONU] Toplu taşıma kaydı varsa muaf tutar, yoksa yerel belleğe ceza yazar (Ortak sunucu listesini etkilemez).', () {
               final r = s.evaluateVehicle(tripId: _id('demo_taxi_norm'), avgSpeedKmh: 68, distanceKm: 8.5, stepDelta: 0, demo: true, ignoreTransitExemption: false);
-              _snack(r.message);
+              _snack('${r.message} [Yerel Demo: Sunucu utanç listesini etkilemez; canlı kayıt için PC GM Paneli]');
             }),
             _btn('[DEMO] 72 km/sa bisiklet hilesi (Hız Reddi)', '72 km/sa ≥ 50 sınırı: aktivite reddedilir, ceza uygulanmaz.', () {
               final r = s.evaluateBike(tripId: _id('demo_bike'), distanceKm: 5, maxSpeedKmh: 72, avgSpeedKmh: 40, demo: true);

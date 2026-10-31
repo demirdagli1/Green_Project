@@ -287,6 +287,8 @@ class SupabaseService extends ChangeNotifier {
     final gw = _gateway;
     if (gw == null) return;
 
+    _shameDebounceTimer?.cancel();
+
     // Önceki aboneliği temizle (Abonelik sızıntısını önler)
     if (_realtimeChannel != null) {
       gw.removeChannel(_realtimeChannel!);
@@ -436,6 +438,17 @@ class SupabaseService extends ChangeNotifier {
 
   Timer? _shameDebounceTimer;
 
+  @override
+  void dispose() {
+    _shameDebounceTimer?.cancel();
+    if (_realtimeChannel != null) {
+      _gateway?.removeChannel(_realtimeChannel!);
+      _realtimeChannel = null;
+    }
+    _outbox?.removeListener(notifyListeners);
+    super.dispose();
+  }
+
   void _scheduleShameRefresh(AppStore store) {
     _shameDebounceTimer?.cancel();
     _shameDebounceTimer = Timer(const Duration(milliseconds: 300), () {
@@ -487,7 +500,9 @@ class SupabaseService extends ChangeNotifier {
     if (gw == null) return false;
 
     // 1. Utanç panosu snapshot'ını klan veya diğer sorguların hatasından BAĞIMSIZ olarak yenile
-    await fetchServerShameBoard(store);
+    final shameOk = await fetchServerShameBoard(store);
+    var usersOk = false;
+    var clansOk = false;
 
     // 2. Kullanıcılar lider tablosu
     try {
@@ -538,6 +553,7 @@ class SupabaseService extends ChangeNotifier {
         store.serverUsers = serverUsers;
         store.commitDirect();
       }
+      usersOk = true;
     } catch (e) {
       debugPrint('[SupabaseService] v_leaderboard_users çekme hatası: $e');
     }
@@ -566,14 +582,24 @@ class SupabaseService extends ChangeNotifier {
         }
         store.commitDirect();
       }
+      clansOk = true;
     } catch (e) {
       debugPrint('[SupabaseService] v_clan_leaderboard çekme hatası: $e');
     }
 
-    _lastSyncTime = DateTime.now();
-    _status = SupabaseSyncStatus.connected;
+    final allOk = shameOk && usersOk && clansOk;
+    if (allOk) {
+      _lastSyncTime = DateTime.now();
+      _lastError = null;
+      _status = SupabaseSyncStatus.connected;
+    } else {
+      _lastError = (shameOk || usersOk || clansOk)
+          ? 'Liderlik verileri kısmen güncellenemedi.'
+          : 'Liderlik verileri güncellenemedi.';
+      _status = SupabaseSyncStatus.error;
+    }
     notifyListeners();
-    return true;
+    return allOk;
   }
 
   Future<void>? _outboxFuture;

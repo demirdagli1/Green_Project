@@ -305,5 +305,51 @@ void main() {
       expect(store.me?.weeklyCarTaxiTrips ?? 0, 0);
       expect(onlineShameList.any((u) => u.id == store.me!.id), false);
     });
+
+    test('evaluate_vehicle sınır kontrolleri, demo izolasyonu ve sunucu utanç panosu tutarlılığı', () {
+      final initialTrips = store.me!.weeklyCarTaxiTrips;
+      final initialWasted = store.me!.weeklyWastedCo2Kg;
+      final initialPoints = store.me!.weeklyPoints;
+      final initialGold = store.me!.goldCoins;
+
+      // Geçersiz parametreler reddedilir
+      final rInvalid = dispatcher.dispatch('evaluate_vehicle', {'distanceKm': -5.0});
+      expect(rInvalid.ok, false);
+      expect(store.me!.weeklyCarTaxiTrips, initialTrips);
+
+      // Geçerli yerel demo araç cezası
+      final rValid = dispatcher.dispatch('evaluate_vehicle', {
+        'distanceKm': 10.0,
+        'avgSpeedKmh': 60.0,
+        'stepDelta': 0,
+        'ignoreTransitExemption': true,
+      });
+      expect(rValid.ok, true);
+      expect(store.me!.weeklyCarTaxiTrips, initialTrips + 1);
+      expect(store.me!.weeklyWastedCo2Kg, closeTo(initialWasted + 1.92, 0.01));
+      // Puan ve altın kesinlikle korunur
+      expect(store.me!.weeklyPoints, initialPoints);
+      expect(store.me!.goldCoins, initialGold);
+
+      // Tekrarlanan aynı tripId çift ceza yazmaz (idempotent)
+      final rDup = dispatcher.dispatch('evaluate_vehicle', {
+        'tripId': 'trip_same_123',
+        'distanceKm': 10.0,
+        'avgSpeedKmh': 60.0,
+        'stepDelta': 0,
+        'ignoreTransitExemption': true,
+      });
+      expect(rDup.ok, true);
+      final tripsAfterFirst = store.me!.weeklyCarTaxiTrips;
+      final rDup2 = dispatcher.dispatch('evaluate_vehicle', {
+        'tripId': 'trip_same_123',
+        'distanceKm': 10.0,
+        'avgSpeedKmh': 60.0,
+        'stepDelta': 0,
+        'ignoreTransitExemption': true,
+      });
+      expect(rDup2.ok, false);
+      expect(store.me!.weeklyCarTaxiTrips, tripsAfterFirst); // Tekrar artmaz
+    });
   });
 }

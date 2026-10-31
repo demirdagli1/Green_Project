@@ -70,3 +70,38 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - Claude Opus/Sonnet ortak kotası bitti; son uygulama düzeltmesi, AGY raporuna göre136 test ve derleme Flash High ile tamamlandı.
 - Adım Ayarla600000 eski puansız kaydı onarır; tekrar aynı değerde çift ödül yok. Adım Ekle sınırı100000;600000 için Ayarla kullanılır.
 - Detaylı sunum docs/SUNUM_DETAYLI_REHBERI.md değil, **docs/SUNUM_DETAYLI_REHBER.md** yolunda; basit rehber korunuyor.
+
+## Dar Hata Teşhis ve Çözümü — Utanç Tablosuna Giriş (Migration 12 & GM Araç Cezası Eylemi)
+- **Kök Neden:**
+  - Mobil uygulamadaki `AdminPanelScreen` içindeki tüm test butonları (`[DEMO] 68 km/sa araba/taksi yakala`, `[DEMO] 68 km/sa taksi`) çağrıları `demo: true` ile çalıştırmaktadır.
+  - `AppStore.evaluateVehicle` fonksiyonu `demo: true` olduğunda `SupabaseService.instance.recordVehiclePenalty` çağrısını atlamakta, ceza yalnızca o telefonun yerel belleğinde kalmakta, Outbox'a veya canlı Supabase'e hiçbir kayıt iletilmemektedir.
+  - Canlı sunucu ortak snapshot'ı (`v_global_shame_board`) veritabanındaki `public.users.weekly_car_taxi_trips > 0` şartına bağlı olduğu için kullanıcının hesabı sunucu listesine girememektedir.
+  - Ayrıca mevcut GM panelinde (`rpc_universal_gm_action`) hedef kullanıcıya araç/taksi cezası işleyecek yetkili bir yönetici eylemi bulunmamaktaydı.
+- **Somut Çözüm (Yetkili GM Eylemi & Güvenlik Koruması):**
+  - Uygulanmış `migration11` gövdesine dokunulmadan, artımlı `supabase/migrations/12_gm_vehicle_penalty.sql` hazırlandı.
+  - `rpc_universal_gm_action` içine yetkili `add_vehicle_penalty` (ve `record_vehicle_penalty`) eylemi eklendi:
+    - Yalnızca `server_admins` tablosunda kayıtlı yöneticiler çağırabilir (yetkisiz çağrı `RAISE EXCEPTION` ile engellenir; keyfi unauth ceza veya admin bypass yok).
+    - Sayısal mesafe aralığı kontrolü (0.1 km - 500 km, varsayılan 8.5 km).
+    - Mesafe başına CO₂ israfı: `ROUND(distance_km * 0.192, 2)` (en az 0.01 kg).
+    - `users.weekly_car_taxi_trips` (+1), `users.weekly_car_taxi_km`, `users.weekly_wasted_co2_kg` artırılır; klan varsa `clans.weekly_wasted_co2_kg` güncellenir.
+    - Puan, altın ve envanter KESİNTİSİ YAPILMAZ; tam olarak korunur.
+    - `activities` tablosuna `car_taxi_penalty` (puan=0, co2=-israf) aktivite kaydı ve `admin_audit_trail` tablosuna idempotency kayıtları işlenir.
+    - Tekrarlanan çağrılarda `duplicate: true` dönerek mükerrer ceza/çift sayaç artışı önlenir.
+  - `tools/universal_gm/index.html` (PC GM Paneli) arayüzüne seçili kullanıcı için:
+    - `🚗 Araba / Taksi Cezası Ekle (Utanç Tablosuna Yaz)` kontrolü ve mesafe girdisi eklendi.
+  - Mobil uygulamada (`admin_panel_screen.dart`):
+    - Demo butonları sessizce canlı cezaya çevrilmedi; buton alt başlıkları ve bildirim metinleri `[YEREL DEMO SİMÜLASYONU - Sunucu listesini etkilemez, canlı liste için PC GM Paneli]` olarak açık ve net hale getirildi.
+  - Preflight testi: `supabase/preflight_gm_vehicle_penalty.sql` (BEGIN/ROLLBACK) ile yetkisiz ret, hedef kullanıcının `v_global_shame_board` görünümüne girmesi, idempotency, puan/altın bütünlüğü ve iki oturum + anonim tutarlılığı doğrulandı.
+- **Test ve Analiz Durumu:**
+  - `dart analyze`: **No issues found!** (0 hata, 0 uyarı).
+  - Otomatik testler: `--no-pub --concurrency=1` ile **137/137 test BAŞARIYLA GEÇTİ** (`All tests passed!`).
+  - Mobil build hemen başlatılmadı (kullanıcı talimatı gereği root canlı SQL uyguladıktan sonra yapılacak).
+
+## Sunum öncesi son durum
+- Migration 12 root tarafından BEGIN/ROLLBACK preflight ve fonksiyon gövdesi eşleşmesi doğrulandıktan sonra `green_project_gm_vehicle_penalty` adıyla canlıya uygulandı.
+- PC GM panelinde seçili gerçek kullanıcıya açıkça yönetici testi olarak etiketlenmiş utanç bildirimi gönderilir; oyuncunun 10 altın ve günlük 1 mesaj kurallı mesajı değildir. Sunucu kaydı cihaz teslimi garantisi değildir. Araç mesafesi 0,1–500 km dışında veya boşsa reddedilir.
+- Liderlik sorgularında kısmi veya tam hata artık başarılı bağlantı göstermez; utanç snapshot sorgusu bağımsız kalır. Realtime aboneliği yenilenirken ve servis kapatılırken bekleyen debounce zamanlayıcısı iptal edilir. Zamanlayıcı iptali doğrudan davranış testiyle doğrulanmadı.
+- Dart analizi temiz; GM, Supabase, UI ve utanç kapsamındaki 43 test geçti. Panel JavaScript kontrolleri geçersiz/geçerli mesafe ve gerçek/demo hedef durumlarını doğruladı. Telefon bildirimi ve iki cihazda canlı görünüm kullanıcının elle testini bekliyor.
+- Çevrimdışı Gradle debug derlemesi başarılı. `releases/YeSilAdim-debug.apk`: 173.964.791 bayt; SHA-256 `9cc672f8876ec475702d2c7c14fe849b94fd167e7c72fc3356f39212bbdbbe31`; checksum doğrulandı. Kurulum root tarafından yürütülür.
+
+- Root son kurulum: bağlı telefonda adb install --no-streaming -r Success; veriler korunarak MainActivity açıldı. Son güvenlik danışmanı 0 ERROR /14 WARN. Yeni ürün değişikliği yok; kullanıcı elle test edecek.
