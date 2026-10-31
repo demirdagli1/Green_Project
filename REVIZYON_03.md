@@ -1,8 +1,12 @@
 # Revizyon 03 — yönetici görev sözleşmesi
 
+ÖNEMLİ: REV03_INCELEME_NOTU.md root'un ilk 06 migration inceleme engellerini içeriyor, mutlaka oku ve çöz. Root taslağı henüz DAĞITMADI.
+
 Kullanıcı 10 altın mesaj bedeli / 3 puan kısa otobüs cezasını açıkça ONAYLADI. Bunlar artık varsayım değil.
 
 Root doğrulama güncellemesi: mevcut supabase/verification.sql açık BEGIN/ROLLBACK ile aynı MCP execute_sql hattında başarıyla çalıştı (hata yok, kalıcı test mutasyonu yok). Yeni şema henüz yok; ilave revizyonlar için ayrı artımlı migration gerekir.
+
+Root 00:40 UTC canlı advisor bulguları: v_clan_shame_board ve v_global_shame_board SECURITY DEFINER view ERROR; compute_league_tier, trg_sync_user_league_tier, trg_sync_clan_league_tier mutable search_path WARN. Bunları artımlı migration'da düzelt; INVOKER görünümlerinin alttaki özel sütun grantlerine takılmadan yetkili public alanlardan çalışmasını doğrula. Authenticated definer RPC uyarıları otomatik olarak bütün RPC'leri kapatma gerekçesi değil, auth.uid/admin kontrolü ve grantleri tek tek incele. Anonim politikalar ürün tercihi, başka kullanıcının altın/envanter/device bilgisi açılmasın.
 
 Önce AGENT_YONETIM.md ve ilgili mevcut raporları oku. Codex yalnız yönetir; tüm ürün/test/SQL/yapılandırma kodu AGY Gemini 3.8 Flash High tarafından yazılır. Git commit/push yapma. İndirme yok, cihazda otomatik gezinme yok. Tek ağır test/build, mevcut çevrimdışı araçlar ve bellek sınırları geçerli. Değişen kullanıcı dosyalarını koru.
 
