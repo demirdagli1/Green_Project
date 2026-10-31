@@ -71,3 +71,13 @@ supabase/migrations/grant_admin.sql
 /evidence/current_test.png
 /evidence/screen_05_qr_nfc.png
 /evidence/screen_06_shop_profile.png
+
+# Local agent instructions, prompts, session notes and working evidence
+**/AGENTS.md
+**/agents.md
+/AGENT_YONETIM.md
+/DURUM.md
+/Düzenlemeler.txt
+/docs/arsiv/
+/docs/isterler/
+/evidence/
