@@ -998,6 +998,26 @@ class AppStore extends ChangeNotifier {
     return false;
   }
 
+  void reconcileRejectedPurchase(String itemId, Set<String> serverInventory, AppUser profile) {
+    final aliases = <String>{itemId};
+    final alias = DemoData.legacyItemAliases[itemId];
+    final reverse = DemoData.itemToLegacyAliases[itemId];
+    if (alias != null) aliases.add(alias);
+    if (reverse != null) aliases.add(reverse);
+    if (aliases.any(serverInventory.contains)) return;
+    owned.removeAll(aliases);
+    final user = me;
+    if (user != null && user.serverUserId == profile.serverUserId) {
+      me = user.copyWith(
+        goldCoins: profile.goldCoins,
+        equippedAvatar: aliases.contains(user.equippedAvatar) ? profile.equippedAvatar : user.equippedAvatar,
+        equippedFrame: aliases.contains(user.equippedFrame) ? profile.equippedFrame : user.equippedFrame,
+        equippedPet: aliases.contains(user.equippedPet) ? profile.equippedPet : user.equippedPet,
+      );
+    }
+    _commit();
+  }
+
   ActionResult buy(String itemId) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     final item = findShopItem(itemId);

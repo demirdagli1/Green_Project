@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:green_project/services/app_store.dart';
@@ -216,6 +217,41 @@ class TestMockSupabaseGateway implements SupabaseGateway {
   }
 }
 
+class _SlowOutboxGateway extends TestMockSupabaseGateway {
+  final firstStarted = Completer<void>();
+  final releaseFirst = Completer<void>();
+  int calls = 0;
+
+  @override
+  Future<dynamic> rpc(String functionName, {Map<String, dynamic>? params}) async {
+    if (functionName == 'rpc_record_steps') {
+      calls++;
+      if (calls == 1) {
+        firstStarted.complete();
+        await releaseFirst.future;
+      }
+      return {'ok': true};
+    }
+    return super.rpc(functionName, params: params);
+  }
+}
+
+class _RejectedPurchaseGateway extends TestMockSupabaseGateway {
+  _RejectedPurchaseGateway() : super(userId: 'buyer');
+  int purchaseCalls = 0;
+  @override
+  Future<dynamic> rpc(String functionFunction, {Map<String, dynamic>? params}) async {
+    if (functionFunction == 'rpc_buy_shop_item') {
+      purchaseCalls++;
+      throw const PostgrestException(message: 'Yetersiz altın! Gerekli: 1200, Mevcut: 50', code: 'P0001');
+    }
+    if (functionFunction == 'rpc_get_my_profile') {
+      return {'ok': true, 'user': {'id': 'buyer', 'gold_coins': 50}, 'inventory': <String>[]};
+    }
+    return super.rpc(functionFunction, params: params);
+  }
+}
+
 void main() {
   group('Canlı Supabase İstemcisi & Entegrasyon Sözleşmesi Testleri', () {
     late MemoryStore mem;
@@ -226,6 +262,71 @@ void main() {
       store = AppStore(backend: mem);
       await store.load();
       AppStore.instance = store;
+    });
+
+    test('Yetersiz altın reddi kuyrukta beklemez, yanlış yerel sahiplik geri alınır', () async {
+      final gateway = _RejectedPurchaseGateway();
+      final outbox = SupabaseOutbox(storage: mem);
+      final service = SupabaseService(gateway: gateway, outbox: outbox);
+      store.register(deviceId: 'buyer-local', name: 'Alıcı', clanName: 'KTÜ Kanuni');
+      store.me = store.me!.copyWith(serverUserId: 'buyer', goldCoins: 1000);
+      store.owned.add('frame_oxygen_glow');
+      await outbox.enqueue(actionType: 'buy_shop_item', payload: {'p_item_slug': 'frame_oxygen_glow'});
+      await service.processOutbox(store);
+      expect(outbox.pendingCount, 0);
+      expect(outbox.items.single.status.name, 'rejected');
+      expect(store.isItemOwned('frame_oxygen_glow'), isFalse);
+      expect(store.serverProfile!.goldCoins, 50);
+      await service.processOutbox(store);
+      expect(gateway.purchaseCalls, 1);
+      service.dispose();
+    });
+
+    test('Eski bakiye reddi yeniden yüklemede güvenle korunur ve tekrar satın alınmaz', () async {
+      final outbox = SupabaseOutbox(storage: mem);
+      final item = await outbox.enqueue(actionType: 'buy_shop_item', payload: {'p_item_slug': 'frame_oxygen_glow'});
+      await outbox.markFailed(item.id, 'PostgrestException: Yetersiz altın! Gerekli: 1200, Mevcut: 50');
+      final restored = SupabaseOutbox(storage: mem);
+      await restored.load();
+      final gateway = _RejectedPurchaseGateway();
+      final service = SupabaseService(gateway: gateway, outbox: restored);
+      await service.processOutbox(store);
+      expect(restored.pendingCount, 0);
+      expect(restored.rejectedCount, 1);
+      expect(gateway.purchaseCalls, 0);
+      service.dispose();
+    });
+
+    test('İşlem sürerken eklenen olay sonraki turda işlenir', () async {
+      final gateway = _SlowOutboxGateway();
+      final outbox = SupabaseOutbox(storage: mem);
+      final service = SupabaseService(gateway: gateway, outbox: outbox);
+      await outbox.enqueue(actionType: 'record_steps', payload: {'p_event_id': 'one'});
+      final first = service.processOutbox(store);
+      await gateway.firstStarted.future;
+      await outbox.enqueue(actionType: 'record_steps', payload: {'p_event_id': 'two'});
+      final second = service.processOutbox(store);
+      gateway.releaseFirst.complete();
+      await Future.wait([first, second]);
+      expect(gateway.calls, 2);
+      expect(outbox.pendingCount, 0);
+      service.dispose();
+    });
+
+    test('Bağlantı düzelince başarısız olay periyodik döngüde yeniden denenir', () async {
+      final gateway = TestMockSupabaseGateway();
+      final outbox = SupabaseOutbox(storage: mem);
+      final service = SupabaseService(gateway: gateway, outbox: outbox,
+          shameRefreshInterval: const Duration(milliseconds: 40));
+      await outbox.enqueue(actionType: 'record_steps', payload: {'p_event_id': 'network-retry'});
+      gateway.shouldFailNetwork = true;
+      await service.processOutbox(store);
+      expect(outbox.pendingCount, 1);
+      gateway.shouldFailNetwork = false;
+      service.setupRealtimeSubscriptions(store);
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      expect(outbox.pendingCount, 0);
+      service.dispose();
     });
 
     test('1. Auth Session Reuse: Mevcut oturum varken gereksiz yeni anon hesap açılmaz', () async {
@@ -298,6 +399,7 @@ void main() {
 
       // Ağ geri geldi -> outbox başarıyla boşalır
       gateway.shouldFailNetwork = false;
+      item.nextRetryAtMs = DateTime.now().millisecondsSinceEpoch - 1;
       await service.processOutbox(store);
       expect(outbox.pendingCount, 0);
       expect(gateway.processedEvents.contains('event-uuid-fixed-123'), isTrue);

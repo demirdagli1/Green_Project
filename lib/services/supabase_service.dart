@@ -305,6 +305,7 @@ class SupabaseService extends ChangeNotifier {
       _periodicRefreshRunning = true;
       try {
         await fetchServerLeaderboard(store);
+        await processOutbox(store);
       } finally {
         _periodicRefreshRunning = false;
       }
@@ -501,6 +502,15 @@ class SupabaseService extends ChangeNotifier {
         equippedFrame: row['frame_slug'] as String? ?? 'none',
         equippedPet: row['pet_slug'] as String? ?? 'none',
       );
+      if (result['inventory'] is List) {
+        final inventory = (result['inventory'] as List).whereType<String>().toSet();
+        for (final rejected in _outbox?.rejectedItems ?? <OutboxItem>[]) {
+          final slug = rejected.payload['p_item_slug'];
+          if (rejected.actionType == 'buy_shop_item' && slug is String) {
+            store.reconcileRejectedPurchase(slug, inventory, store.serverProfile!);
+          }
+        }
+      }
       store.commitDirect();
       return true;
     } catch (e) {
@@ -608,13 +618,24 @@ class SupabaseService extends ChangeNotifier {
   }
 
   Future<void>? _outboxFuture;
+  bool _outboxFlushRequested = false;
 
   /// Çevrimdışı Kuyruğu (Outbox) Sunucuya İletir.
   Future<void> processOutbox(AppStore store) {
-    if (_outboxFuture != null) return _outboxFuture!;
-    return _outboxFuture = _doProcessOutbox(store).whenComplete(() {
+    if (_outboxFuture != null) {
+      _outboxFlushRequested = true;
+      return _outboxFuture!;
+    }
+    return _outboxFuture = _drainOutboxRequests(store).whenComplete(() {
       _outboxFuture = null;
     });
+  }
+
+  Future<void> _drainOutboxRequests(AppStore store) async {
+    do {
+      _outboxFlushRequested = false;
+      await _doProcessOutbox(store);
+    } while (_outboxFlushRequested && !_disposed);
   }
 
   Future<void> _doProcessOutbox(AppStore store) async {
@@ -701,6 +722,12 @@ class SupabaseService extends ChangeNotifier {
         } catch (e) {
           final errStr = e.toString();
           debugPrint('[SupabaseService] Outbox işlem hatası (${item.actionType}): $errStr');
+          if (item.actionType == 'buy_shop_item' && e is PostgrestException &&
+              e.message.toLowerCase().contains('yetersiz altın')) {
+            await ob.markRejected(item.id, 'Satın alma reddedildi: yetersiz altın.');
+            await fetchServerProfile(store);
+            continue;
+          }
           final isPerm = SupabaseOutbox.isPermanentError(errStr);
           await ob.markFailed(item.id, errStr, forceQuarantine: isPerm);
           if (!isPerm) {

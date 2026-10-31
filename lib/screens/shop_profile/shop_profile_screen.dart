@@ -308,6 +308,16 @@ class ShopProfileScreen extends StatelessWidget {
                                     style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.amber.shade900),
                                   ),
                                 ),
+                              if (sb.outbox != null && sb.outbox!.rejectedCount > 0)
+                                Text(
+                                  '${sb.outbox!.rejectedCount} satın alma reddedildi: yetersiz altın',
+                                  style: const TextStyle(fontSize: 10, color: AppColors.fireRed, fontWeight: FontWeight.w700),
+                                ),
+                              if (sb.outbox != null && sb.outbox!.quarantinedCount > 0)
+                                Text(
+                                  '${sb.outbox!.quarantinedCount} işlem kontrol gerektiriyor',
+                                  style: const TextStyle(fontSize: 10, color: AppColors.fireRed, fontWeight: FontWeight.w700),
+                                ),
                             ],
                           ),
                           Text(

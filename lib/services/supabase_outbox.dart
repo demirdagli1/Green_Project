@@ -4,7 +4,7 @@ import 'package:uuid/uuid.dart';
 
 import 'storage.dart';
 
-enum OutboxItemStatus { pending, processing, completed, failed, quarantined }
+enum OutboxItemStatus { pending, processing, completed, failed, quarantined, rejected }
 
 class OutboxItem {
   final String id;
@@ -87,24 +87,51 @@ class SupabaseOutbox extends ChangeNotifier {
 
   List<OutboxItem> get quarantinedItems =>
       _items.where((i) => i.status == OutboxItemStatus.quarantined).toList();
+  List<OutboxItem> get rejectedItems =>
+      _items.where((i) => i.status == OutboxItemStatus.rejected).toList();
 
   int get pendingCount => _items.where((i) => i.status == OutboxItemStatus.pending || i.status == OutboxItemStatus.failed).length;
   int get quarantinedCount => quarantinedItems.length;
+  int get rejectedCount => rejectedItems.length;
+
+  Future<void> markRejected(String id, String reason) async {
+    final idx = _items.indexWhere((i) => i.id == id);
+    if (idx < 0) return;
+    _items[idx].status = OutboxItemStatus.rejected;
+    _items[idx].lastError = reason;
+    _items[idx].nextRetryAtMs = null;
+    await _persist();
+  }
 
   Future<void> load() async {
+    var migrated = false;
     try {
       final raw = await storage.read(storageKey);
       if (raw != null && raw.isNotEmpty) {
         final list = jsonDecode(raw) as List;
         _items.clear();
         for (final item in list) {
-          _items.add(OutboxItem.fromJson(item as Map<String, dynamic>));
+          final loaded = OutboxItem.fromJson(item as Map<String, dynamic>);
+          // Eski sürümün kesin bakiye reddini tekrar satın alma isteğine çevirmeyin.
+          if (loaded.actionType == 'buy_shop_item' &&
+              (loaded.status == OutboxItemStatus.failed || loaded.status == OutboxItemStatus.quarantined) &&
+              (loaded.lastError?.toLowerCase().contains('yetersiz altın') ?? false)) {
+            loaded.status = OutboxItemStatus.rejected;
+            loaded.lastError = 'Satın alma reddedildi: yetersiz altın.';
+            loaded.nextRetryAtMs = null;
+            migrated = true;
+          }
+          _items.add(loaded);
         }
       }
     } catch (e) {
       debugPrint('[Outbox] Yükleme hatası: $e');
     }
-    notifyListeners();
+    if (migrated) {
+      await _persist();
+    } else {
+      notifyListeners();
+    }
   }
 
   Future<void> _persist() async {
