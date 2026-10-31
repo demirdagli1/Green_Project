@@ -43,7 +43,6 @@ test/            Otomatik testler
 supabase/        Şema değişiklikleri ve doğrulama SQL dosyaları
 tools/universal_gm/  PC yönetim paneli
 Logolar/         Logo ve kozmetik görselleri
-docs/            Kullanım, mimari ve sunum belgeleri
 releases/        Sürüm notları ve APK sağlama toplamı
 ```
 
@@ -79,14 +78,6 @@ python3 -m http.server 8787 --bind 127.0.0.1 --directory tools/universal_gm
 ```
 
 Tarayıcıda `http://127.0.0.1:8787` adresini açın. Panel işlemleri sunucuda yönetici yetkisi gerektirir. Yönetici oturum dosyaları ve gizli anahtarlar paylaşılmaz; web sunucusunun köküne konmaz.
-
-## Belgeler
-
-- [Kullanım rehberi](docs/KULLANIM.md)
-- [Algoritmalar ve mimari](docs/ALGORITMALAR_VE_MIMARI.md)
-- [Kısa sunum rehberi](docs/SUNUM_CALISMA_REHBERI.md)
-- [Detaylı sunum rehberi](docs/SUNUM_DETAYLI_REHBER.md)
-- [Proje fikri ve sınır durumları](docs/SUNUM_FIKIR_VE_SINIR_DURUMLARI.md)
 
 ## Geliştirme kapsamı
 
