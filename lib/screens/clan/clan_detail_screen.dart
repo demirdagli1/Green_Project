@@ -67,9 +67,15 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> {
   }
 
   String _getMemberRole(int index, AppUser member) {
-    if (index == 0) return 'Lider';
-    if (index <= 2) return 'Kıdemli';
-    return 'Üye';
+    if (member.clanRole == 'leader' || member.clanRole == 'Lider') return 'Lider';
+    if (member.clanRole == 'elder' || member.clanRole == 'Kıdemli') return 'Kıdemli';
+    if (member.clanRole == 'member' || member.clanRole == 'Üye') {
+      // Sunucu henüz özel rol atamamışsa lig sıralaması mantığı fallback olarak kullanılır
+      if (index == 0) return 'Lider';
+      if (index <= 2) return 'Kıdemli';
+      return 'Üye';
+    }
+    return member.clanRole;
   }
 
   Color _getRoleColor(String role) {

@@ -300,7 +300,7 @@ void main() {
         'demo': true,
       });
       expect(rShort.ok, isTrue);
-      expect(rShort.data!['isShortBusPenalty'], isTrue);
+      expect(rShort.data['isShortBusPenalty'], isTrue);
       expect(store.me!.weeklyPoints, initialPoints - 3);
 
       // GM komutu ile normal otobüs simülasyonu (3.5 km)
@@ -310,7 +310,7 @@ void main() {
         'demo': true,
       });
       expect(rNormal.ok, isTrue);
-      expect(rNormal.data!['activityType'], 'publicTransitBus');
+      expect(rNormal.data['activityType'], 'publicTransitBus');
       expect(store.me!.weeklyPoints, initialPoints); // -3 + 3 = initialPoints
     });
   });

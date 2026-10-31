@@ -36,7 +36,7 @@ Kabloya gerek yok, telefonu eline alıp şu sırayla dokun:
 
 * **Adım sayma:** Telefonun kendi adım sensörünü kullanıyoruz. Sallayarak puan kazanmayı azaltmak için hız ve hareket verilerini de kontrol etmeye çalışıyoruz; her hileyi kesin yakaladığımızı söylemiyoruz.
 * **İnternet yoksa:** Uygulamanın içinde küçük bir giden kutusu (not defteri) var. İnternet kesilse bile adımlar oraya not ediliyor. İnternet gelince sırayla ortak listeye postalanıyor.
-* **Puanların karışmaması:** Her adım paketinin üzerinde tek kullanımlık bir fiş numarası var. Aynı fiş iki kere gitse bile internetteki sistem ikinciyi çöpe atıyor, mükerrer puan vermiyor.
+* **Aynı adımı iki kez saymamak:** Telefon, gönderdiği her yürüyüş kaydına bir numara verir. İnternet kopunca aynı kayıt tekrar giderse sunucu numarasından tanır: "Bunu zaten saydım." Böylece aynı yürüyüşe iki kez puan verilmez.
 * **Güvenlik:** Altın harcama ve yönetici işlemleri internetteki sistemde de kontrol ediliyor. Normal kullanıcıya yönetici yetkisi verilmiyor. Bu, telefon verisinin asla taklit edilemeyeceği anlamına gelmiyor.
 * **Gerçek durum:** Tek bir telefonda puanlar, mağaza, hile kontrolleri çalışıyor. Ancak 3 farklı telefonda puanların anlık olarak birbirine eşitlenmesi ve arka planda otomatik otobüs tahmini halen **geliştirme aşamasındadır**.
 

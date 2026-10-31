@@ -688,23 +688,37 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
 
                       setDialogState(() => isSending = true);
 
-                      // Atomik yerel altın kesintisi ve günlük kota kaydı
-                      store.me = store.me!.copyWith(goldCoins: store.me!.goldCoins - 10);
-                      store.markShameMessageSent();
-
-                      final res = await Hub.supabase.sendShameMessage(
-                        targetUserId: targetUid,
-                        message: text,
-                      );
-
-                      if (mounted) {
-                        Navigator.pop(dialogCtx);
-                        ScaffoldMessenger.of(this.context).showSnackBar(
-                          SnackBar(
-                            content: Text(res['message'] as String? ?? 'Utanç mesajı başarıyla iletildi! (-10 Altın)'),
-                            backgroundColor: res['ok'] == true ? AppColors.emeraldGreen : AppColors.fireRed,
-                          ),
+                      try {
+                        final res = await Hub.supabase.sendShameMessage(
+                          targetUserId: targetUid,
+                          message: text,
                         );
+
+                        if (res['ok'] == true) {
+                          // Yalnızca sunucu onayladığında 10 altın düşülür ve günlük kota kaydedilir
+                          store.me = store.me!.copyWith(goldCoins: store.me!.goldCoins - 10);
+                          store.markShameMessageSent();
+                        }
+
+                        if (mounted) {
+                          Navigator.pop(dialogCtx);
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text(res['message'] as String? ?? (res['ok'] == true ? 'Utanç mesajı başarıyla iletildi! (-10 Altın)' : 'Mesaj iletilemedi.')),
+                              backgroundColor: res['ok'] == true ? AppColors.emeraldGreen : AppColors.fireRed,
+                            ),
+                          );
+                        }
+                      } catch (e) {
+                        if (mounted) {
+                          setDialogState(() => isSending = false);
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            SnackBar(
+                              content: Text('Bağlantı hatası: $e. Altın bakiyeniz korundu.'),
+                              backgroundColor: AppColors.fireRed,
+                            ),
+                          );
+                        }
                       }
                     },
               child: isSending

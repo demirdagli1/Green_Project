@@ -19,6 +19,7 @@ class AppUser {
   final String equippedPet;
   final String? photoPath;
   final String bio;
+  final String clanRole;
 
   const AppUser({
     required this.id,
@@ -41,6 +42,7 @@ class AppUser {
     this.equippedPet = 'none',
     this.photoPath,
     this.bio = '',
+    this.clanRole = 'member',
   });
 
   AppUser copyWith({
@@ -62,6 +64,7 @@ class AppUser {
     bool clearPhoto = false,
     String? bio,
     String? serverUserId,
+    String? clanRole,
   }) {
     return AppUser(
       id: id,
@@ -84,6 +87,7 @@ class AppUser {
       equippedPet: equippedPet ?? this.equippedPet,
       photoPath: clearPhoto ? null : (photoPath ?? this.photoPath),
       bio: bio ?? this.bio,
+      clanRole: clanRole ?? this.clanRole,
     );
   }
 
@@ -108,6 +112,7 @@ class AppUser {
         'equipped_pet': equippedPet,
         'photo_path': photoPath,
         'bio': bio,
+        'clan_role': clanRole,
       };
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
@@ -131,5 +136,6 @@ class AppUser {
         equippedPet: j['equipped_pet'] as String? ?? 'none',
         photoPath: j['photo_path'] as String?,
         bio: j['bio'] as String? ?? '',
+        clanRole: j['clan_role'] as String? ?? 'member',
       );
 }

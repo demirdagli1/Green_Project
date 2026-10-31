@@ -367,12 +367,13 @@ class SupabaseService extends ChangeNotifier {
                 equippedFrame: rec['frame_slug'] as String? ?? old.equippedFrame,
               );
             } else {
+              final rawClan = (rec['clan_id'] as num?)?.toInt();
               store.serverUsers.add(AppUser(
                 id: uid,
                 deviceId: 'SRV-$uid',
                 serverUserId: uid,
                 username: rec['nickname'] as String? ?? 'Gezgin',
-                clanId: Clan.sqlToId((rec['clan_id'] as num?)?.toInt() ?? 1),
+                clanId: rawClan != null ? Clan.sqlToId(rawClan) : '',
                 clanName: '',
                 isDemo: false,
                 todaySteps: (rec['today_steps'] as num?)?.toInt() ?? 0,
@@ -382,6 +383,7 @@ class SupabaseService extends ChangeNotifier {
                 equippedAvatar: rec['avatar_url'] as String? ?? 'default_avatar',
                 equippedFrame: rec['frame_slug'] as String? ?? 'none',
                 equippedPet: rec['pet_slug'] as String? ?? 'none',
+                clanRole: rec['clan_role'] as String? ?? 'member',
               ));
             }
             store.commitDirect();
@@ -432,12 +434,13 @@ class SupabaseService extends ChangeNotifier {
           final uid = row['user_id'] as String;
           final isMe = uid == store.me?.serverUserId;
           if (!isMe) {
+            final rawClan = (row['clan_id'] as num?)?.toInt();
             serverUsers.add(AppUser(
               id: uid,
               deviceId: 'SRV-$uid',
               serverUserId: uid,
               username: row['nickname'] as String? ?? 'Gezgin',
-              clanId: Clan.sqlToId((row['clan_id'] as num?)?.toInt() ?? 1),
+              clanId: rawClan != null ? Clan.sqlToId(rawClan) : '',
               clanName: row['clan_name'] as String? ?? '',
               isDemo: row['is_demo'] as bool? ?? false,
               todaySteps: (row['today_steps'] as num?)?.toInt() ?? 0,
@@ -448,6 +451,7 @@ class SupabaseService extends ChangeNotifier {
               equippedAvatar: row['avatar_url'] as String? ?? 'default_avatar',
               equippedFrame: row['frame_slug'] as String? ?? 'none',
               equippedPet: row['pet_slug'] as String? ?? 'none',
+              clanRole: row['clan_role'] as String? ?? 'member',
             ));
           }
         }

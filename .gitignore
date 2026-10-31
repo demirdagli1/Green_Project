@@ -52,8 +52,16 @@ app.*.map.json
 /.tools/
 /.env
 /.env.*
+/.gm-private/
 *.apk
 *.aab
+*.local.json
+*.secret.json
+*.private.json
+tools/universal_gm/config.local.json
+tools/universal_gm/*.private.json
+tools/universal_gm/.env
+supabase/migrations/grant_admin.sql
 
 # Device runtime captures can contain location, identifiers or local GM tokens
 /evidence/[0-9][0-9]_*.txt

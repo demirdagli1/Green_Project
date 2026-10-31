@@ -140,16 +140,14 @@ class SupabaseOutbox extends ChangeNotifier {
     await _persist();
   }
 
-  /// Kalıcı / şema / parametre hatası olup olmadığını tespit eder.
+  /// Kalıcı / zehirli paket parametre hatası olup olmadığını tespit eder.
+  /// Not: Dağıtım aşamasındaki 'not found' veya geçici 404/42883 hataları anında karantinaya alınmaz;
+  /// retry limiti dolana kadar üstel geri çekilme ile yeniden denenir.
   static bool isPermanentError(String error) {
     final lower = error.toLowerCase();
-    return lower.contains('geçersiz') ||
-        lower.contains('bulunamadı') ||
-        lower.contains('reddedildi') ||
-        lower.contains('violates') ||
-        lower.contains('permission denied') ||
-        lower.contains('syntax error') ||
-        lower.contains('not found');
+    return lower.contains('violates check constraint') ||
+        lower.contains('invalid input syntax') ||
+        lower.contains('syntax error');
   }
 
   Future<void> markFailed(String id, String error, {bool forceQuarantine = false}) async {
@@ -175,6 +173,23 @@ class SupabaseOutbox extends ChangeNotifier {
       }
       await _persist();
     }
+  }
+
+  /// Karantinaya alınmış öğeleri yeniden kuyruğa taşır (Outbox Recovery).
+  Future<int> retryQuarantinedItems() async {
+    int count = 0;
+    for (final item in _items) {
+      if (item.status == OutboxItemStatus.quarantined) {
+        item.status = OutboxItemStatus.failed;
+        item.retryCount = 0;
+        item.nextRetryAtMs = null;
+        count++;
+      }
+    }
+    if (count > 0) {
+      await _persist();
+    }
+    return count;
   }
 
   Future<void> clear() async {

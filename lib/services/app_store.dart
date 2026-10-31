@@ -321,15 +321,15 @@ class AppStore extends ChangeNotifier {
     if (me == null) return;
     var u = me!;
     me = u.copyWith(
-      weeklyPoints: u.weeklyPoints + points,
-      allTimePoints: u.allTimePoints + points,
-      preventedCo2Kg: u.preventedCo2Kg + co2,
+      weeklyPoints: max(0, u.weeklyPoints + points),
+      allTimePoints: points > 0 ? (u.allTimePoints + points) : u.allTimePoints,
+      preventedCo2Kg: max(0.0, u.preventedCo2Kg + co2),
     );
     final i = clans.indexWhere((c) => c.id == u.clanId);
     if (i >= 0 && points != 0) {
       clans[i] = clans[i].copyWith(
-        weeklyPoints: clans[i].weeklyPoints + points,
-        allTimePoints: clans[i].allTimePoints + points,
+        weeklyPoints: max(0, clans[i].weeklyPoints + points),
+        allTimePoints: points > 0 ? (clans[i].allTimePoints + points) : clans[i].allTimePoints,
       );
     }
   }
@@ -589,7 +589,7 @@ class AppStore extends ChangeNotifier {
     return null;
   }
 
-  /// [payload] QR/NFC metni, NFC UID veya çıplak kod. Cooldown durak kodu başına, QR ve NFC ortak.
+  /// [payload] QR/NFC metni, NFC UID veya çıplak kod. Cooldown durak kodu ve otomatik biniş ortak kilitlidir.
   ActionResult scanTransit(String? payload, {required String source, DateTime? at}) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     _sync();
@@ -600,9 +600,16 @@ class AppStore extends ChangeNotifier {
     }
     final code = stop.code;
     final now = at ?? clock();
-    final lastMs = transitLast[code];
+
+    // Ortak Cooldown Kontrolü: Aynı durak veya otomatik biniş son 45 dk içinde varsa engelle
+    int? latestTransitMs = transitLast[code];
+    final busTripMs = transitLast['BUS_TRIP'];
+    if (busTripMs != null && (latestTransitMs == null || busTripMs > latestTransitMs)) {
+      latestTransitMs = busTripMs;
+    }
+
     final remaining = rules.transitRemaining(
-        lastMs == null ? null : DateTime.fromMillisecondsSinceEpoch(lastMs), now);
+        latestTransitMs == null ? null : DateTime.fromMillisecondsSinceEpoch(latestTransitMs), now);
     if (remaining != null) {
       final mins = (remaining.inSeconds / 60).ceil();
       return ActionResult(false,
@@ -621,12 +628,19 @@ class AppStore extends ChangeNotifier {
     return ActionResult(true, '+${stop.pointsReward} puan', points: stop.pointsReward, co2Kg: stop.co2SavingKg);
   }
 
+  bool get hasBoardingQrInLast45Min {
+    final now = _nowMs;
+    return transitLast.entries
+        .where((e) => e.key != 'BUS_TRIP')
+        .any((e) => now - e.value >= 0 && now - e.value < 45 * 60000);
+  }
+
   bool get transitInLast45Min {
     final now = _nowMs;
     return transitLast.values.any((t) => now - t >= 0 && now - t < 45 * 60000);
   }
 
-  /// Otobüs yolculuğu ödülü (+3 puan, CO2 tasarrufu).
+  /// Otobüs yolculuğu ödülü (+3 puan veya binişte QR okutulmuşsa tek settlement uzlaştırması).
   ActionResult creditBusTrip({
     required double distanceKm,
     required int busScore,
@@ -635,10 +649,16 @@ class AppStore extends ChangeNotifier {
   }) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     _sync();
-    const pts = 3;
+
+    // Ortak Yolculuk Uzlaştırması: Binişte QR okutulmuşsa tek ödül kuralı
+    final alreadyQrSettled = hasBoardingQrInLast45Min;
+    final pts = alreadyQrSettled ? 0 : 3;
     final co2 = double.parse((distanceKm * (0.192 - 0.035)).toStringAsFixed(2));
+
     _award(pts, co2: co2);
     transitLast['BUS_TRIP'] = _nowMs;
+    // Biniş QR'ı bu yolculukla uzlaştırıldı ve tüketildi
+    transitLast.removeWhere((k, v) => k != 'BUS_TRIP');
 
     final tripEventId = 'bus_${_nowMs}_${Random().nextInt(9999)}';
     if (!demo) {
@@ -651,12 +671,14 @@ class AppStore extends ChangeNotifier {
       ));
     }
     _commit();
-    final msg = explanation ?? 'Otobüs yolculuğu doğrulandı! (+3 Puan, $co2 kg CO₂ tasarrufu)';
+    final msg = explanation ?? (alreadyQrSettled
+        ? 'Otobüs yolculuğu tamamlandı ($distanceKm km). Binişte QR ile puan alındığı için ilave puan verilmedi, $co2 kg CO₂ tasarrufu işlendi.'
+        : 'Otobüs yolculuğu doğrulandı! (+3 Puan, $co2 kg CO₂ tasarrufu)');
     _note('Otobüs / Dolmuş Doğrulandı', msg);
     return ActionResult(true, msg, points: pts, co2Kg: co2);
   }
 
-  /// Kısa otobüs yolculuğu cezası (0 < mesafe <= 500m -> -3 haftalık puan, 0 CO2).
+  /// Kısa otobüs yolculuğu cezası (≤500m -> QR binişi varsa net -3 ceza için -6 puan ve CO2 iadesi; saf otomatikte -3 puan).
   ActionResult applyShortBusPenalty({
     required double distanceKm,
     required int busScore,
@@ -665,9 +687,17 @@ class AppStore extends ChangeNotifier {
   }) {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     _sync();
-    final actualDeducted = min(me!.weeklyPoints, 3);
-    _award(-actualDeducted, co2: 0);
+
+    final alreadyQrSettled = hasBoardingQrInLast45Min;
+    // Binişte QR okutup +3 puan ve 1.15 kg CO2 aldıysa: +3 geri alınır (-3) ve ceza (-3) = -6 puan; CO2 sıfırlanır
+    final penaltyPoints = alreadyQrSettled ? 6 : 3;
+    final actualDeducted = min(me!.weeklyPoints, penaltyPoints);
+    final co2Reversal = alreadyQrSettled ? -1.15 : 0.0;
+
+    _award(-actualDeducted, co2: co2Reversal);
     transitLast['BUS_TRIP'] = _nowMs;
+    // Biniş QR'ı bu yolculukla uzlaştırıldı ve tüketildi
+    transitLast.removeWhere((k, v) => k != 'BUS_TRIP');
 
     final tripEventId = 'short_bus_${_nowMs}_${Random().nextInt(9999)}';
     if (!demo) {
@@ -680,9 +710,11 @@ class AppStore extends ChangeNotifier {
       ));
     }
     _commit();
-    final msg = explanation ?? 'Kısa otobüs yolculuğu (≤500m): -$actualDeducted puan ceza kesildi.';
+    final msg = explanation ?? (alreadyQrSettled
+        ? 'Kısa otobüs yolculuğu (≤500m): Başlangıçtaki QR ödülü (+3) iptal edildi ve -3 ceza kesildi (Net -$actualDeducted puan).'
+        : 'Kısa otobüs yolculuğu (≤500m): -$actualDeducted puan ceza kesildi.');
     _note('Kısa Otobüs Cezası', msg);
-    return ActionResult(true, msg, points: -actualDeducted, co2Kg: 0.0);
+    return ActionResult(true, msg, points: -actualDeducted, co2Kg: co2Reversal);
   }
 
   /// Otomatik aktivite ve toplu taşıma sınıflandırıcısı değerlendirmesi (Revizyon 03).
