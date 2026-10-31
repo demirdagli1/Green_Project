@@ -124,3 +124,7 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - Utanç tablosundaki sunucu demo kayıtları `[DEMO]` diye etiketlenir ve canlı mesaj gönderilemeyeceği açıklanır. Son incelemede 15 utanç kaydının tümü demo, gerçek kullanıcı kaydı ise 0 idi; adım/puan değişikliği utanç sırasını değiştirmez, bunun için yetkili araç/taksi cezası gerekir. İlk 10 + kişinin sırası penceresi korunur.
 - İlgili 39 test ve Dart analizi başarılı. Testte yerel eski kota, sunucu kota reddi, sıfırlama sonrası yeni işlem anahtarıyla kabul, bakiye ve geçersiz yanıt kontrol edildi. Gerçek cihazda mesaj teslimi henüz test edilmedi.
 - Son çevrimdışı Gradle derlemesi başarılı; `releases/YeSilAdim-debug.apk` 173.961.603 bayt, SHA-256 `37600f4310083fbd1edb895a7c55a4188de5a47f5c09dfed6f99b8afa029013a`, checksum doğrulandı. Bu yeni APK'nın kurulumu root tarafından yürütülür.
+
+## Son cihaz teslimi ve yayın
+- Son APK iki bağlı telefona veriler korunarak başarıyla yüklendi ve açıldı.
+- Kullanıcının açık isteğiyle ana dal GitHub’a gönderilecek. Ayrı otobüs taslağı ana sürüme dahil değil.
