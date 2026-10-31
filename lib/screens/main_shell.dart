@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../core/constants/app_colors.dart';
@@ -39,6 +41,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     Hub.store.tick();
     await Hub.sensors.refresh();
     await Hub.sensors.start();
+    unawaited(Hub.supabase.onAppResume(Hub.store));
   }
 
   @override

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
+import '../../data/demo_data.dart';
 import '../../models/app_user.dart';
 import '../../models/shop_item.dart';
 import '../../services/app_store.dart';
@@ -147,32 +148,59 @@ class ShopProfileScreen extends StatelessWidget {
                 decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
                 child: Column(
                   children: [
-                    Stack(
-                      alignment: Alignment.bottomRight,
-                      children: [
-                        CircleAvatar(
-                          radius: 38,
-                          backgroundImage: (hasPhoto ? FileImage(File(u.photoPath!)) : null) as ImageProvider?,
-                          child: !hasPhoto
-                              ? Text(
-                                  u.username.trim().isEmpty ? '?' : u.username.trim().substring(0, 1).toUpperCase(),
-                                  style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
-                                )
-                              : null,
-                        ),
-                        InkWell(
-                          onTap: () => _showPhotoOptions(context, store, u),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: const BoxDecoration(
-                              color: AppColors.primaryPurple,
-                              shape: BoxShape.circle,
+                    Builder(
+                      builder: (context) {
+                        final petAsset = DemoData.getPetAssetPath(u.equippedPet);
+                        final isPetOwnedAndEquipped = petAsset != null && store.isItemOwned(u.equippedPet);
+
+                        return Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Stack(
+                              alignment: Alignment.bottomRight,
+                              children: [
+                                CircleAvatar(
+                                  radius: 38,
+                                  backgroundImage: (hasPhoto ? FileImage(File(u.photoPath!)) : null) as ImageProvider?,
+                                  child: !hasPhoto
+                                      ? Text(
+                                          u.username.trim().isEmpty ? '?' : u.username.trim().substring(0, 1).toUpperCase(),
+                                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w900),
+                                        )
+                                      : null,
+                                ),
+                                InkWell(
+                                  onTap: () => _showPhotoOptions(context, store, u),
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(
+                                      color: AppColors.primaryPurple,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                                  ),
+                                ),
+                              ],
                             ),
-                            child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
-                          ),
-                        ),
-                      ],
+                            if (isPetOwnedAndEquipped) ...[
+                              const SizedBox(width: 14),
+                              Tooltip(
+                                message: 'Kuşanılan Yoldaş: ${readableEquipped(store, u.equippedPet, ShopCategory.pet)}',
+                                child: SizedBox(
+                                  width: 64,
+                                  height: 64,
+                                  child: Image.asset(
+                                    petAsset,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        );
+                      },
                     ),
                     const SizedBox(height: 8),
                     Text(u.username, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),

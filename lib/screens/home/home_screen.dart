@@ -6,9 +6,11 @@ import '../../models/app_user.dart';
 import '../../models/clan.dart';
 import '../../models/league_tier.dart';
 import '../../services/app_store.dart';
+import '../../widgets/clan_league_badge.dart';
 import '../../widgets/individual_league_badge.dart';
 import '../../services/auto_motion_engine.dart';
 import '../../services/hub.dart';
+import '../clan/clan_detail_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   final VoidCallback? onOpenLeaderboardClan;
@@ -92,7 +94,7 @@ class HomeScreen extends StatelessWidget {
                       if (isNarrow) {
                         return Column(
                           children: [
-                            _unifiedClanCard(clan, clanTier, clanRank, onOpenLeaderboardClan),
+                            _unifiedClanCard(context, clan, clanTier, clanRank, onOpenLeaderboardClan),
                             const SizedBox(height: 10),
                             _unifiedIndividualCard(user, indTier, userRank, onOpenLeaderboardIndividual),
                           ],
@@ -100,7 +102,7 @@ class HomeScreen extends StatelessWidget {
                       }
                       return Row(
                         children: [
-                          Expanded(child: _unifiedClanCard(clan, clanTier, clanRank, onOpenLeaderboardClan)),
+                          Expanded(child: _unifiedClanCard(context, clan, clanTier, clanRank, onOpenLeaderboardClan)),
                           const SizedBox(width: 12),
                           Expanded(child: _unifiedIndividualCard(user, indTier, userRank, onOpenLeaderboardIndividual)),
                         ],
@@ -334,9 +336,9 @@ class HomeScreen extends StatelessWidget {
         ]),
       );
 
-  Widget _unifiedClanCard(Clan? clan, LeagueTier tier, int clanRank, VoidCallback? onTap) {
+  Widget _unifiedClanCard(BuildContext context, Clan? clan, LeagueTier tier, int clanRank, VoidCallback? fallbackOnTap) {
     return InkWell(
-      onTap: onTap,
+      onTap: fallbackOnTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -359,36 +361,45 @@ class HomeScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(color: tier.color, borderRadius: BorderRadius.circular(10)),
-                  child: Text(tier.symbol, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 11)),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        clan != null ? clan.name : 'Klan Yok',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-                      ),
-                      Text(
-                        '${tier.clanName} • ${clan?.memberCount ?? 0} üye',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10, color: AppColors.textMuted),
-                      ),
-                    ],
+            InkWell(
+              key: const ValueKey('clan_detail_button'),
+              onTap: () {
+                if (clan != null) {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => ClanDetailScreen(clan: clan)),
+                  );
+                } else if (fallbackOnTap != null) {
+                  fallbackOnTap();
+                }
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Row(
+                children: [
+                  ClanLeagueBadge(tier: tier, size: 34),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          clan != null ? clan.name : 'Klan Yok',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+                        ),
+                        Text(
+                          '${tier.clanName} • ${clan?.memberCount ?? 0} üye (Detay)',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 10, color: AppColors.primaryPurple, fontWeight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const Icon(Icons.arrow_forward_ios, size: 11, color: AppColors.textMuted),
+                ],
+              ),
             ),
             const SizedBox(height: 8),
             Container(

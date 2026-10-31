@@ -4,6 +4,7 @@ class Clan {
   final int memberCount;
   final int weeklyPoints;
   final int allTimePoints;
+  final double weeklyWastedCo2Kg;
 
   const Clan({
     required this.id,
@@ -11,6 +12,7 @@ class Clan {
     required this.memberCount,
     required this.weeklyPoints,
     this.allTimePoints = 0,
+    this.weeklyWastedCo2Kg = 0.0,
   });
 
   /// 5'ten az üyesi olan klan sıralamaya alınmaz (4 hariç, 5 dahil).
@@ -65,12 +67,19 @@ class Clan {
 
   double get hybridScore => hybridScoreFor(allTime: false);
 
-  Clan copyWith({int? memberCount, int? weeklyPoints, int? allTimePoints}) => Clan(
+  Clan copyWith({
+    int? memberCount,
+    int? weeklyPoints,
+    int? allTimePoints,
+    double? weeklyWastedCo2Kg,
+  }) =>
+      Clan(
         id: id,
         name: name,
         memberCount: memberCount ?? this.memberCount,
         weeklyPoints: weeklyPoints ?? this.weeklyPoints,
         allTimePoints: allTimePoints ?? this.allTimePoints,
+        weeklyWastedCo2Kg: weeklyWastedCo2Kg ?? this.weeklyWastedCo2Kg,
       );
 
   Map<String, dynamic> toJson() => {
@@ -79,6 +88,7 @@ class Clan {
         'member_count': memberCount,
         'weekly_points': weeklyPoints,
         'all_time_points': allTimePoints,
+        'weekly_wasted_co2_kg': weeklyWastedCo2Kg,
       };
 
   factory Clan.fromJson(Map<String, dynamic> j) => Clan(
@@ -87,5 +97,6 @@ class Clan {
         memberCount: (j['member_count'] as num).toInt(),
         weeklyPoints: (j['weekly_points'] as num).toInt(),
         allTimePoints: (j['all_time_points'] as num?)?.toInt() ?? 0,
+        weeklyWastedCo2Kg: (j['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? 0.0,
       );
 }

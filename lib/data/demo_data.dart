@@ -385,7 +385,7 @@ class DemoData {
     ),
     ShopItem(
       id: 'pet_robo_bee',
-      title: 'Biyo-Mekanik Arı (Pet)',
+      title: 'Biyo-Mekanik Arı Bit-Bee (Pet)',
       description: 'Profilinde uçuşarak polen ve oksijen puanı toplayan siber arı.',
       category: ShopCategory.pet,
       price: 950,
@@ -393,8 +393,8 @@ class DemoData {
     ),
     ShopItem(
       id: 'pet_leaf_fox',
-      title: 'Orman Tilkisi (Pet)',
-      description: 'Bisiklet sürdüğünde seninle birlikte koşan animasyonlu yoldaş.',
+      title: 'Ozon Perisi Aura (Pet)',
+      description: 'Karadeniz yaylalarının temiz havasından doğan parıltılı yoldaş.',
       category: ShopCategory.pet,
       price: 1200,
       iconCode: 'paw',
@@ -425,7 +425,12 @@ class DemoData {
     'biosphere_crown': 'frame_biosfer_gold',
     'pine_seedling': 'pet_pine_sprout',
     'biomech_bee': 'pet_robo_bee',
+    'bit_bee': 'pet_robo_bee',
+    'bit-bee': 'pet_robo_bee',
     'forest_fox': 'pet_leaf_fox',
+    'auro_fairy': 'pet_leaf_fox',
+    'auro-fairy': 'pet_leaf_fox',
+    'pet_ozone_fairy': 'pet_leaf_fox',
   };
 
   static const Map<String, String> itemToLegacyAliases = {
@@ -435,8 +440,21 @@ class DemoData {
     'frame_biosfer_gold': 'biosphere_crown',
     'pet_pine_sprout': 'pine_seedling',
     'pet_robo_bee': 'biomech_bee',
-    'pet_leaf_fox': 'forest_fox',
+    'pet_leaf_fox': 'auro_fairy',
   };
+
+  /// Kuşanılan pet için şeffaf PNG görsel dosya yolu.
+  static String? getPetAssetPath(String? petId) {
+    if (petId == null || petId.isEmpty || petId == 'none') return null;
+    final normalized = legacyItemAliases[petId] ?? petId;
+    if (normalized == 'pet_robo_bee' || normalized == 'biomech_bee') {
+      return 'Logolar/kozmetik/petler/bit-bee.png';
+    }
+    if (normalized == 'pet_leaf_fox' || normalized == 'forest_fox' || normalized == 'auro_fairy') {
+      return 'Logolar/kozmetik/petler/auro-fairy.png';
+    }
+    return null;
+  }
 
   /// Geriye dönük uyumluluk için eski ürün listesi.
   static const List<ShopItem> legacyShopItems = [

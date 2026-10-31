@@ -8,6 +8,7 @@ import '../../core/utils/name_masker.dart';
 import '../../models/app_user.dart';
 import '../../models/clan.dart';
 import '../../models/league_tier.dart';
+import '../../widgets/clan_league_badge.dart';
 import '../../widgets/individual_league_badge.dart';
 import '../../services/hub.dart';
 
@@ -118,7 +119,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
               const Divider(height: 1, thickness: 1, color: Color(0xFFF1F5F9)),
               Expanded(
                 child: _shame
-                    ? _shameList(store)
+                    ? (_clanMode ? _clanShameList(store) : _shameList(store))
                     : (_clanMode ? _clanList(store) : _userList(store)),
               ),
               Container(
@@ -169,9 +170,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
     bool me = false,
     bool highlighted = false,
     Color? bg,
+    VoidCallback? onTap,
   }) {
     final isSpecial = me || highlighted;
-    return Container(
+    Widget card = Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -260,6 +262,15 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         ],
       ),
     );
+
+    if (onTap != null) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: card,
+      );
+    }
+    return card;
   }
 
   Widget _userList(store) {
@@ -414,17 +425,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       child: const Icon(Icons.shield, color: Colors.white, size: 16),
     );
 
-    final leagueBadge = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-      decoration: BoxDecoration(
-        color: tier.color,
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Text(
-        tier.symbol,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 10),
-      ),
-    );
+    final leagueBadge = ClanLeagueBadge(tier: tier, size: 22);
 
     return _row(
       rank: item.rank,
@@ -454,7 +455,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
-              'Rakip satırları DEMO verisidir; yalnızca "Sen" gerçek yerel veridir.',
+              'Bireysel Utanç Tablosu • Dokunarak 10 altın karşılığı dürtme mesajı gönderebilirsin (Günde 1 kez).',
               style: TextStyle(fontSize: 11, color: AppColors.textMuted),
             ),
           ),
@@ -489,8 +490,261 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         child: Text('🚕', style: TextStyle(fontSize: 12)),
       ),
       title: '${NameMasker.maskShameName(u.username)}${isMe ? ' (Sen)' : ''}',
-      sub: '${u.weeklyCarTaxiTrips} araba/taksi yolculuğu',
+      sub: '${u.weeklyCarTaxiTrips} araba/taksi yolculuğu • Dokun: Dürt',
       trail: '${u.weeklyWastedCo2Kg.toStringAsFixed(1)} kg CO₂',
+      onTap: () => _openShamePokeDialog(context, u, store),
     );
+  }
+
+  /// Klan Utanç Tablosu: En çok israf yapan klanlar listelenir.
+  Widget _clanShameList(store) {
+    final worst = store.worstClans();
+    final myClanId = store.me?.clanId;
+    final windowItems = LeaderboardWindow.build<Clan>(
+      items: worst,
+      isSelf: (c) => myClanId != null && c.id == myClanId,
+    );
+
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Klan Utanç Tablosu • En çok CO₂ israfı yapan klanlar listelenir. Dokunarak üyeyi dürtebilirsin.',
+              style: TextStyle(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ),
+        ),
+        if (windowItems.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(child: Text('Bu hafta hiçbir klan utanç tablosunda değil. 🎉')),
+          )
+        else
+          for (final item in windowItems)
+            if (item is LeaderboardEllipsisRow<Clan>)
+              _ellipsisRow()
+            else if (item is LeaderboardDataRow<Clan>) ...[
+              _buildClanShameRow(item, store),
+            ],
+      ],
+    );
+  }
+
+  Widget _buildClanShameRow(LeaderboardDataRow<Clan> item, store) {
+    final c = item.data;
+    final isMyClan = item.isSelf;
+    final tier = LeagueTier.fromPoints(c.weeklyPoints, category: LeagueCategory.clan);
+
+    return _row(
+      rank: item.rank,
+      bg: const Color(0xFFFEF2F2),
+      me: isMyClan,
+      lead: Container(
+        width: 32,
+        height: 32,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFCA5A5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text('🚕', style: TextStyle(fontSize: 14)),
+      ),
+      title: '${c.name}${isMyClan ? ' (Klanın)' : ''}',
+      sub: '${c.memberCount} üye ${c.memberCount < 5 ? '(Yetersiz üye)' : ''} • Dokun: Dürt',
+      badge: ClanLeagueBadge(tier: tier, size: 20),
+      trail: '${c.weeklyWastedCo2Kg.toStringAsFixed(1)} kg CO₂',
+      onTap: () => _openClanShamePokeDialog(context, c, store),
+    );
+  }
+
+  void _openShamePokeDialog(BuildContext context, AppUser target, store) {
+    final myUid = store.me?.serverUserId ?? store.me?.id;
+    final targetUid = target.serverUserId ?? target.id;
+
+    if (myUid == targetUid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Kendine utanç mesajı gönderemezsin!')),
+      );
+      return;
+    }
+
+    if (target.isDemo) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Simülasyon Profili'),
+          content: Text(
+            '${target.username} bir simülasyon/demo kullanıcısıdır. Canlı utanç mesajları yalnızca gerçek sunucu kullanıcılarına iletilebilir ve altın harcanmaz.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (store.hasSentShameMessageToday) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Günlük Kota Doldu'),
+          content: const Text(
+            'Bugünlük utanç mesajı hakkınızı kullandınız (Europe/Istanbul gününde toplam en fazla 1 gönderim).',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if ((store.me?.goldCoins ?? 0) < 10) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Yetersiz Altın'),
+          content: Text(
+            'Utanç mesajı göndermek için 10 altın gerekir. Mevcut bakiyeniz: ${store.me?.goldCoins ?? 0} altın.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    final msgCtrl = TextEditingController();
+    bool isSending = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Text('🎯 Utanç Dürtmesi', style: TextStyle(fontWeight: FontWeight.w900, fontSize: 17)),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Hedef: ${target.username} • Bedel: 10 Altın',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: msgCtrl,
+                maxLength: 50,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  hintText: 'Dalga geçen mesajını yaz (Maks 50 karakter)...',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isSending ? null : () => Navigator.pop(dialogCtx),
+              child: const Text('İptal'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primaryPurple),
+              onPressed: isSending
+                  ? null
+                  : () async {
+                      final text = msgCtrl.text.trim();
+                      if (text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Mesaj metni boş olamaz.')),
+                        );
+                        return;
+                      }
+                      if (text.runes.length > 50) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Mesaj en fazla 50 karakter olabilir.')),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isSending = true);
+
+                      // Atomik yerel altın kesintisi ve günlük kota kaydı
+                      store.me = store.me!.copyWith(goldCoins: store.me!.goldCoins - 10);
+                      store.markShameMessageSent();
+
+                      final res = await Hub.supabase.sendShameMessage(
+                        targetUserId: targetUid,
+                        message: text,
+                      );
+
+                      if (mounted) {
+                        Navigator.pop(dialogCtx);
+                        ScaffoldMessenger.of(this.context).showSnackBar(
+                          SnackBar(
+                            content: Text(res['message'] as String? ?? 'Utanç mesajı başarıyla iletildi! (-10 Altın)'),
+                            backgroundColor: res['ok'] == true ? AppColors.emeraldGreen : AppColors.fireRed,
+                          ),
+                        );
+                      }
+                    },
+              child: isSending
+                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Gönder (10 🪙)', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _openClanShamePokeDialog(BuildContext context, Clan clan, store) {
+    // Klan üyelerinden gerçek kullanıcı ara
+    final clanId = clan.id;
+    final realMembers = store.serverUsers
+        .where((u) => u.clanId == clanId && !u.isDemo && (u.serverUserId ?? u.id) != (store.me?.serverUserId ?? store.me?.id))
+        .toList();
+
+    if (realMembers.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(clan.name),
+          content: const Text(
+            'Bu klanda şu an çevrimiçi canlı bir üye bulunmuyor. Mesajlar yalnızca gerçek kullanıcılara iletilebilir.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Tamam'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    // Gerçek üyelerden birini hedefle
+    final target = realMembers.first;
+    _openShamePokeDialog(context, target, store);
   }
 }

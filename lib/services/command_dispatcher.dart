@@ -190,6 +190,34 @@ class CommandDispatcher {
         );
         return CommandResult(ok: r.ok, message: r.message, data: {'wastedCo2': r.co2Kg});
 
+      case 'classify_transport':
+        final dist = (p['distanceKm'] as num?)?.toDouble() ?? 5.0;
+        final avgSpeed = (p['avgSpeedKmh'] as num?)?.toDouble() ?? 28.0;
+        final maxSpeed = (p['maxSpeedKmh'] as num?)?.toDouble() ?? 45.0;
+        final cadence = (p['stepCadenceSpm'] as num?)?.toInt() ?? 5;
+        final accelVar = (p['accelVariance'] as num?)?.toDouble() ?? 0.15;
+        final hasQrNfc = p['hasNfcOrQrScan'] as bool? ?? false;
+        final isReliable = p['isGpsReliable'] as bool? ?? true;
+        final accuracy = (p['gpsAccuracyMeters'] as num?)?.toDouble() ?? 10.0;
+        final demo = p['demo'] as bool? ?? true;
+
+        final res = store.evaluateTransportClassification(
+          distanceKm: dist,
+          avgSpeedKmh: avgSpeed,
+          maxSpeedKmh: maxSpeed,
+          stepCadenceSpm: cadence,
+          accelVariance: accelVar,
+          hasNfcOrQrScan: hasQrNfc,
+          isGpsReliable: isReliable,
+          gpsAccuracyMeters: accuracy,
+          demo: demo,
+        );
+        return CommandResult(
+          ok: true,
+          message: res.explanation,
+          data: res.toJson(),
+        );
+
       case 'evaluate_bike':
         final rawDist = p['distanceKm'];
         final rawMax = p['maxSpeedKmh'];
@@ -236,6 +264,10 @@ class CommandDispatcher {
       case 'flush_pending_steps':
         final r = store.flushPendingStepsWindow();
         return CommandResult(ok: r.ok, message: r.message);
+
+      case 'reset_shame_quota':
+        store.resetShameQuota();
+        return const CommandResult(ok: true, message: 'Utanç tablosu günlük mesaj kotası sıfırlandı.');
 
       case 'set_bio':
         final bio = (p['bio'] as String?) ?? '';

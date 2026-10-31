@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Yeşil Adım — Evrensel GM ve Yönetim Paneli</title>
+  <style>
+    :root {
+      --bg: #0F172A;
+      --card-bg: #1E293B;
+      --card-border: #334155;
+      --primary: #8B5CF6;
+      --primary-hover: #7C3AED;
+      --accent: #10B981;
+      --danger: #EF4444;
+      --warning: #F59E0B;
+      --text: #F8FAFC;
+      --text-muted: #94A3B8;
+      --input-bg: #0B132B;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body { background: var(--bg); color: var(--text); padding: 24px; min-height: 100vh; }
+    .container { max-width: 1100px; margin: 0 auto; }
+    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--card-border); }
+    h1 { font-size: 24px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+    .status-badge { font-size: 12px; padding: 4px 10px; border-radius: 999px; font-weight: 700; background: #064E3B; color: #6EE7B7; border: 1px solid #059669; }
+    .grid { display: grid; grid-template-columns: 340px 1fr; gap: 20px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 16px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.25); }
+    h2 { font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+    input, select { width: 100%; padding: 10px 14px; background: var(--input-bg); border: 1px solid var(--card-border); border-radius: 10px; color: var(--text); font-size: 14px; margin-bottom: 14px; outline: none; transition: border-color 0.2s; }
+    input:focus, select:focus { border-color: var(--primary); }
+    button { background: var(--primary); color: white; border: none; border-radius: 10px; padding: 10px 16px; font-size: 13px; font-weight: 700; cursor: pointer; transition: background 0.2s, transform 0.1s; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    button:hover { background: var(--primary-hover); }
+    button:active { transform: scale(0.98); }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: #DC2626; }
+    .btn-success { background: var(--accent); }
+    .btn-success:hover { background: #059669; }
+    .btn-warning { background: var(--warning); color: #1E293B; }
+    .btn-warning:hover { background: #D97706; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .banner { padding: 12px 16px; border-radius: 12px; font-size: 13px; font-weight: 600; margin-bottom: 16px; display: none; }
+    .banner-success { background: #064E3B; color: #A7F3D0; border: 1px solid #059669; }
+    .banner-error { background: #7F1D1D; color: #FECACA; border: 1px solid #DC2626; }
+    .user-pill { padding: 12px; background: var(--input-bg); border: 1px solid var(--card-border); border-radius: 12px; margin-bottom: 10px; cursor: pointer; transition: all 0.2s; display: flex; justify-content: space-between; align-items: center; }
+    .user-pill:hover, .user-pill.active { border-color: var(--primary); background: #2E1065; }
+    .action-row { display: flex; gap: 10px; margin-bottom: 12px; }
+    .action-row input { margin-bottom: 0; }
+    .audit-log { max-height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px; background: var(--input-bg); padding: 12px; border-radius: 10px; border: 1px solid var(--card-border); }
+    .audit-entry { padding: 6px 0; border-bottom: 1px solid #1E293B; }
+    .audit-time { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div>
+        <h1>⚡ Yeşil Adım — Evrensel GM Paneli</h1>
+        <p style="color: var(--text-muted); font-size: 13px; margin-top: 4px;">Kablo / ADB gerektirmez • Doğrudan Supabase Cloud • server_admins Yetkili</p>
+      </div>
+      <div>
+        <span class="status-badge" id="cloudStatus">Cloud: fhaxxraibydsjikxacbb</span>
+      </div>
+    </header>
+
+    <div id="msgBanner" class="banner"></div>
+
+    <!-- GİRİŞ VE OTURUM KARTI -->
+    <div class="card" id="authCard">
+      <h2>🔐 Yönetici Oturumu (server_admins)</h2>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <!-- Seviye 1: E-posta / Şifre ile Güvenli Giriş -->
+        <div>
+          <label>Yönetici E-Posta</label>
+          <input type="email" id="adminEmail" placeholder="admin@yesiladim.local">
+          <label>Şifre</label>
+          <input type="password" id="adminPassword" placeholder="••••••••">
+          <button style="width: 100%;" onclick="loginWithPassword()">🔑 E-Posta ile Giriş Yap</button>
+        </div>
+
+        <!-- Seviye 2: Doğrudan JWT / Anon Key -->
+        <div>
+          <label>Manuel JWT Bearer Token / Oturum Anahtarı</label>
+          <input type="password" id="adminTokenInput" placeholder="eyJhbGciOi...">
+          <button style="width: 100%;" class="btn-warning" onclick="saveAuthToken()">💾 Token'ı Kaydet ve Doğrula</button>
+          <div style="margin-top: 10px; font-size: 11px; color: var(--text-muted);">
+            Aktif Yönetici UID: <span id="currentUidDisplay" style="color: var(--accent); font-weight: bold;">Giriş Yapılmadı</span>
+          </div>
+        </div>
+      </div>
+      <p style="font-size: 11px; color: var(--text-muted); margin-top: 14px;">
+        Not: İşlemler Supabase <code>rpc_universal_gm_action</code> tarafından doğrulanır. Yalnızca <code>server_admins</code> tablosundaki yetkili yöneticiler işlem yapabilir. <code>service_role</code> gizli anahtarı kesinlikle kullanılmaz.
+      </p>
+    </div>
+
+    <div class="grid">
+      <!-- SOL PANEL: KULLANICI SEÇİMİ -->
+      <div>
+        <div class="card">
+          <h2>👥 Kullanıcı Seçimi</h2>
+          <button class="btn-sm" style="margin-bottom: 14px; width: 100%;" onclick="loadUsersList()">🔄 Kullanıcı Listesini Yenile</button>
+          <div id="usersListContainer" style="max-height: 520px; overflow-y: auto;">
+            <p style="color: var(--text-muted); font-size: 12px;">Kullanıcılar yükleniyor...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAĞ PANEL: SEÇİLİ KULLANICI YÖNETİMİ -->
+      <div>
+        <div class="card">
+          <h2>🎯 Seçili Kullanıcı: <span id="selectedUserName" style="color: var(--primary);">Henüz Seçilmedi</span></h2>
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px;">
+            <div style="background: var(--input-bg); padding: 10px; border-radius: 8px;">
+              <div style="font-size: 10px; color: var(--text-muted);">BUGÜNKÜ ADIM</div>
+              <div id="statSteps" style="font-size: 16px; font-weight: 800;">—</div>
+            </div>
+            <div style="background: var(--input-bg); padding: 10px; border-radius: 8px;">
+              <div style="font-size: 10px; color: var(--text-muted);">HAFTALIK PUAN</div>
+              <div id="statPoints" style="font-size: 16px; font-weight: 800;">—</div>
+            </div>
+            <div style="background: var(--input-bg); padding: 10px; border-radius: 8px;">
+              <div style="font-size: 10px; color: var(--text-muted);">STREAK</div>
+              <div id="statStreak" style="font-size: 16px; font-weight: 800;">—</div>
+            </div>
+          </div>
+
+          <!-- ADIM YÖNETİMİ -->
+          <label>Adım Ekle / Ayarla (1 - 100.000)</label>
+          <div class="action-row">
+            <input type="number" id="inStepAdd" value="1000" placeholder="Eklenecek adım">
+            <button onclick="executeAction('add_steps', { count: parseInt(document.getElementById('inStepAdd').value) })">+ Adım Ekle</button>
+            <input type="number" id="inStepSet" placeholder="Toplam yap">
+            <button class="btn-warning" onclick="executeAction('set_steps', { total: parseInt(document.getElementById('inStepSet').value) })">Ayarla</button>
+          </div>
+
+          <!-- ALTIN YÖNETİMİ -->
+          <label>Altın Ekle / Ayarla (-100.000 - +100.000)</label>
+          <div class="action-row">
+            <input type="number" id="inGoldAdd" value="500" placeholder="Eklenecek altın">
+            <button class="btn-success" onclick="executeAction('add_gold', { amount: parseInt(document.getElementById('inGoldAdd').value) })">+ Altın Ekle</button>
+            <input type="number" id="inGoldSet" placeholder="Toplam yap">
+            <button class="btn-warning" onclick="executeAction('set_gold', { total: parseInt(document.getElementById('inGoldSet').value) })">Ayarla</button>
+          </div>
+
+          <!-- PUAN YÖNETİMİ -->
+          <label>Haftalık Puan Ekle / Çıkar (Klan ve Bireysel, -10.000 - +10.000)</label>
+          <div class="action-row">
+            <input type="number" id="inPointAdd" value="50" placeholder="Eklenecek puan">
+            <button onclick="executeAction('add_points', { points: parseInt(document.getElementById('inPointAdd').value) })">+ Puan Ekle</button>
+          </div>
+
+          <!-- STREAK YÖNETİMİ -->
+          <label>Seri (Streak) Gün Ekle / Ayarla (1 - 365)</label>
+          <div class="action-row">
+            <input type="number" id="inStreakAdd" value="1" placeholder="Eklenecek gün">
+            <button onclick="executeAction('add_streak', { days: parseInt(document.getElementById('inStreakAdd').value) })">+ Gün Ekle</button>
+            <input type="number" id="inStreakSet" placeholder="Seri günü yap">
+            <button class="btn-warning" onclick="executeAction('set_streak', { days: parseInt(document.getElementById('inStreakSet').value) })">Ayarla</button>
+          </div>
+
+          <!-- UTANÇ KOTASI SIFIRLAMA -->
+          <label>Utanç Tablosu Dürtme Mesajı Kotası (Mesaj geçmişini silmeden kotayı sıfırlar)</label>
+          <div class="action-row">
+            <button class="btn-danger" style="width: 100%;" onclick="executeAction('reset_shame_quota', {})">
+              🔄 Hedef Kullanıcının Bugünkü Utanç Mesaj Kotasını Güvenle Sıfırla
+            </button>
+          </div>
+        </div>
+
+        <!-- DENETİM İZİ (AUDIT LOG) -->
+        <div class="card">
+          <h2>📜 Sunucu Denetim İzi (Audit Trail)</h2>
+          <div class="audit-log" id="auditLogContainer">
+            <div class="audit-entry"><span class="audit-time">[Sistem]</span> Evrensel GM Paneli hazır.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://fhaxxraibydsjikxacbb.supabase.co";
+    const ANON_KEY = "sb_publishable_7TEibMmt8wbJtKTYb_vjlA_xZoCnN5J";
+
+    let adminToken = localStorage.getItem('gm_admin_token') || ANON_KEY;
+    let selectedUserId = null;
+    let selectedUserObj = null;
+    let cachedUsers = [];
+
+    document.getElementById('adminTokenInput').value = adminToken;
+    updateUidFromToken(adminToken);
+
+    function parseJwt(token) {
+      try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+          return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function updateUidFromToken(token) {
+      const decoded = parseJwt(token);
+      const display = document.getElementById('currentUidDisplay');
+      if (decoded && decoded.sub) {
+        display.innerText = decoded.sub + (decoded.email ? ` (${decoded.email})` : '');
+      } else {
+        display.innerText = (token === ANON_KEY) ? 'Anon Key (Giriş Yapılmadı)' : 'Özel Token';
+      }
+    }
+
+    async function loginWithPassword() {
+      const email = document.getElementById('adminEmail').value.trim();
+      const password = document.getElementById('adminPassword').value;
+      if (!email || !password) {
+        showBanner('E-posta ve şifre zorunludur.', false);
+        return;
+      }
+      try {
+        const res = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY
+          },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.access_token) {
+          throw new Error(data.error_description || data.msg || 'Giriş başarısız.');
+        }
+        adminToken = data.access_token;
+        localStorage.setItem('gm_admin_token', adminToken);
+        document.getElementById('adminTokenInput').value = adminToken;
+        updateUidFromToken(adminToken);
+        showBanner('Yönetici girişi başarılı! Oturum anahtarı kaydedildi.', true);
+        loadUsersList();
+      } catch (e) {
+        showBanner('Giriş Hatası: ' + e.message, false);
+      }
+    }
+
+    function saveAuthToken() {
+      const val = document.getElementById('adminTokenInput').value.trim();
+      if (val) {
+        adminToken = val;
+        localStorage.setItem('gm_admin_token', adminToken);
+        updateUidFromToken(adminToken);
+        showBanner('Oturum anahtarı güncellendi.', true);
+        loadUsersList();
+      }
+    }
+
+    function showBanner(msg, isOk) {
+      const b = document.getElementById('msgBanner');
+      b.className = 'banner ' + (isOk ? 'banner-success' : 'banner-error');
+      b.innerHTML = (isOk ? '✅ ' : '⚠️ ') + msg;
+      b.style.display = 'block';
+      setTimeout(() => { b.style.display = 'none'; }, 6000);
+    }
+
+    function addAuditEntry(action, status, details) {
+      const cont = document.getElementById('auditLogContainer');
+      const time = new Date().toLocaleTimeString('tr-TR');
+      const div = document.createElement('div');
+      div.className = 'audit-entry';
+      div.innerHTML = `<span class="audit-time">[${time}]</span> <strong>${action}</strong>: ${status} (${details})`;
+      cont.prepend(div);
+    }
+
+    async function loadUsersList() {
+      const cont = document.getElementById('usersListContainer');
+      cont.innerHTML = '<p style="color: var(--text-muted); font-size: 12px;">Kullanıcılar yükleniyor...</p>';
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/v_leaderboard_users?select=*&limit=50&order=weekly_points.desc`, {
+          headers: {
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${adminToken}`
+          }
+        });
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ` + await res.text());
+        }
+        cachedUsers = await res.json();
+        renderUsersList();
+      } catch (e) {
+        cont.innerHTML = `<p style="color: var(--danger); font-size: 12px;">Hata: ${e.message}</p>`;
+      }
+    }
+
+    function renderUsersList() {
+      const cont = document.getElementById('usersListContainer');
+      if (!cachedUsers || cachedUsers.length === 0) {
+        cont.innerHTML = '<p style="color: var(--text-muted); font-size: 12px;">Kayıtlı kullanıcı bulunamadı.</p>';
+        return;
+      }
+      cont.innerHTML = '';
+      cachedUsers.forEach(u => {
+        const div = document.createElement('div');
+        div.className = 'user-pill' + (u.user_id === selectedUserId ? ' active' : '');
+        div.onclick = () => selectUser(u);
+        div.innerHTML = `
+          <div>
+            <div style="font-weight: 700; font-size: 13px;">${u.nickname} ${u.is_demo ? '<span style="color: var(--text-muted); font-size: 10px;">[DEMO]</span>' : ''}</div>
+            <div style="font-size: 11px; color: var(--text-muted);">${u.clan_name || 'Klan Yok'}</div>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-weight: 800; font-size: 13px; color: var(--primary);">${u.weekly_points} P</div>
+            <div style="font-size: 10px; color: var(--text-muted);">${u.today_steps} Adım</div>
+          </div>
+        `;
+        cont.appendChild(div);
+      });
+    }
+
+    function selectUser(u) {
+      selectedUserId = u.user_id;
+      selectedUserObj = u;
+      document.getElementById('selectedUserName').innerText = u.nickname + (u.clan_name ? ` (${u.clan_name})` : '');
+      document.getElementById('statSteps').innerText = (u.today_steps || 0).toLocaleString();
+      document.getElementById('statPoints').innerText = (u.weekly_points || 0).toLocaleString();
+      document.getElementById('statStreak').innerText = (u.streak_days || 0) + ' Gün';
+      renderUsersList();
+    }
+
+    async function executeAction(action, payload) {
+      if (!selectedUserId) {
+        showBanner('Lütfen önce sol listeden bir kullanıcı seçin!', false);
+        return;
+      }
+      const idempotencyKey = 'gm_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/rpc_universal_gm_action`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({
+            p_target_user_id: selectedUserId,
+            p_action: action,
+            p_payload: payload,
+            p_idempotency_key: idempotencyKey
+          })
+        });
+        const data = await res.json();
+        if (!res.ok || data.ok === false) {
+          throw new Error(data.message || 'İşlem sunucu tarafından reddedildi.');
+        }
+        showBanner(`İşlem Başarılı: ${action} uygulandı.`, true);
+        addAuditEntry(action, 'Başarılı', JSON.stringify(payload));
+        loadUsersList();
+      } catch (e) {
+        showBanner('Hata: ' + e.message, false);
+        addAuditEntry(action, 'Hata', e.message);
+      }
+    }
+
+    loadUsersList();
+  </script>
+</body>
+</html>

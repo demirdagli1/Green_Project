@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
@@ -10,6 +11,7 @@ import '../models/shop_item.dart';
 import '../models/transit_stop.dart';
 import 'activity_validation_service.dart';
 import 'auto_motion_engine.dart';
+import 'auto_transport_classifier.dart';
 import 'sensor_telemetry.dart';
 import 'storage.dart';
 import 'supabase_service.dart';
@@ -95,6 +97,7 @@ class AppStore extends ChangeNotifier {
   String dayId = '';
   String weekId = '';
   String? lastStreakDay;
+  String? lastShamePokeDate;
   int dayRewardedThousands = 0;
   int? stepBaseline;
   int stepBaselineMs = 0;
@@ -228,6 +231,7 @@ class AppStore extends ChangeNotifier {
         'dayId': dayId,
         'weekId': weekId,
         'lastStreakDay': lastStreakDay,
+        'lastShamePokeDate': lastShamePokeDate,
         'dayRewardedThousands': dayRewardedThousands,
         'stepBaseline': stepBaseline,
         'stepBaselineMs': stepBaselineMs,
@@ -255,6 +259,7 @@ class AppStore extends ChangeNotifier {
     dayId = j['dayId'] as String? ?? '';
     weekId = j['weekId'] as String? ?? '';
     lastStreakDay = j['lastStreakDay'] as String?;
+    lastShamePokeDate = j['lastShamePokeDate'] as String?;
     dayRewardedThousands = (j['dayRewardedThousands'] as num?)?.toInt() ?? 0;
     stepBaseline = (j['stepBaseline'] as num?)?.toInt();
     stepBaselineMs = (j['stepBaselineMs'] as num?)?.toInt() ?? 0;
@@ -339,6 +344,18 @@ class AppStore extends ChangeNotifier {
   void _mark(String id) {
     processed.add(id);
     if (processed.length > 500) processed.removeRange(0, processed.length - 500);
+  }
+
+  bool get hasSentShameMessageToday => lastShamePokeDate == dayId;
+
+  void markShameMessageSent() {
+    lastShamePokeDate = dayId;
+    _commit();
+  }
+
+  void resetShameQuota() {
+    lastShamePokeDate = null;
+    _commit();
   }
 
   // ---------- adım ----------
@@ -607,6 +624,118 @@ class AppStore extends ChangeNotifier {
   bool get transitInLast45Min {
     final now = _nowMs;
     return transitLast.values.any((t) => now - t >= 0 && now - t < 45 * 60000);
+  }
+
+  /// Otobüs yolculuğu ödülü (+3 puan, CO2 tasarrufu).
+  ActionResult creditBusTrip({
+    required double distanceKm,
+    required int busScore,
+    String? explanation,
+    bool demo = false,
+  }) {
+    if (me == null) return const ActionResult(false, 'Profil yok.');
+    _sync();
+    const pts = 3;
+    final co2 = double.parse((distanceKm * (0.192 - 0.035)).toStringAsFixed(2));
+    _award(pts, co2: co2);
+    transitLast['BUS_TRIP'] = _nowMs;
+
+    final tripEventId = 'bus_${_nowMs}_${Random().nextInt(9999)}';
+    if (!demo) {
+      unawaited(SupabaseService.instance.recordBusTrip(
+        eventId: tripEventId,
+        distanceKm: distanceKm,
+        busScore: busScore,
+        isShortPenalty: false,
+        explanation: explanation,
+      ));
+    }
+    _commit();
+    final msg = explanation ?? 'Otobüs yolculuğu doğrulandı! (+3 Puan, $co2 kg CO₂ tasarrufu)';
+    _note('Otobüs / Dolmuş Doğrulandı', msg);
+    return ActionResult(true, msg, points: pts, co2Kg: co2);
+  }
+
+  /// Kısa otobüs yolculuğu cezası (0 < mesafe <= 500m -> -3 haftalık puan, 0 CO2).
+  ActionResult applyShortBusPenalty({
+    required double distanceKm,
+    required int busScore,
+    String? explanation,
+    bool demo = false,
+  }) {
+    if (me == null) return const ActionResult(false, 'Profil yok.');
+    _sync();
+    final actualDeducted = min(me!.weeklyPoints, 3);
+    _award(-actualDeducted, co2: 0);
+    transitLast['BUS_TRIP'] = _nowMs;
+
+    final tripEventId = 'short_bus_${_nowMs}_${Random().nextInt(9999)}';
+    if (!demo) {
+      unawaited(SupabaseService.instance.recordBusTrip(
+        eventId: tripEventId,
+        distanceKm: distanceKm,
+        busScore: busScore,
+        isShortPenalty: true,
+        explanation: explanation,
+      ));
+    }
+    _commit();
+    final msg = explanation ?? 'Kısa otobüs yolculuğu (≤500m): -$actualDeducted puan ceza kesildi.';
+    _note('Kısa Otobüs Cezası', msg);
+    return ActionResult(true, msg, points: -actualDeducted, co2Kg: 0.0);
+  }
+
+  /// Otomatik aktivite ve toplu taşıma sınıflandırıcısı değerlendirmesi (Revizyon 03).
+  ClassificationResult evaluateTransportClassification({
+    required double distanceKm,
+    required double avgSpeedKmh,
+    required double maxSpeedKmh,
+    required int stepCadenceSpm,
+    required double accelVariance,
+    bool userClaimedBikeMode = false,
+    bool hasNfcOrQrScan = false,
+    bool boardedNearBusStop = false,
+    int matchedBusStopDwells = 0,
+    int dolmusStyleShortStops = 0,
+    bool alightedNearBusStop = false,
+    bool isGpsReliable = true,
+    double gpsAccuracyMeters = 10.0,
+    bool demo = false,
+  }) {
+    final result = AutoTransportClassifierService.classifySession(
+      distanceKm: distanceKm,
+      avgSpeedKmh: avgSpeedKmh,
+      maxSpeedKmh: maxSpeedKmh,
+      stepCadenceSpm: stepCadenceSpm,
+      accelVariance: accelVariance,
+      userClaimedBikeMode: userClaimedBikeMode,
+      hasNfcOrQrScan: hasNfcOrQrScan,
+      boardedNearBusStop: boardedNearBusStop,
+      matchedBusStopDwells: matchedBusStopDwells,
+      dolmusStyleShortStops: dolmusStyleShortStops,
+      alightedNearBusStop: alightedNearBusStop,
+      isGpsReliable: isGpsReliable,
+      gpsAccuracyMeters: gpsAccuracyMeters,
+    );
+
+    if (result.activityType == DetectedActivityType.shortBusPenalty) {
+      applyShortBusPenalty(
+        distanceKm: distanceKm,
+        busScore: result.busProbabilityScore,
+        explanation: result.explanation,
+        demo: demo,
+      );
+    } else if (result.activityType == DetectedActivityType.publicTransitBus) {
+      creditBusTrip(
+        distanceKm: distanceKm,
+        busScore: result.busProbabilityScore,
+        explanation: result.explanation,
+        demo: demo,
+      );
+    }
+
+    notifyListeners();
+    return result;
   }
 
   // ---------- bisiklet ----------
@@ -992,6 +1121,40 @@ class AppStore extends ChangeNotifier {
 
   List<Clan> rankedClans({bool hybrid = true, bool allTime = false}) =>
       clans.where((c) => c.isEligibleForRanking).toList()..sort((a, b) => compareClans(a, b, hybrid: hybrid, allTime: allTime));
+
+  /// Klan Utanç Listesi: En çok israf yapan klanlar deterministik sıralanır.
+  List<Clan> worstClans() {
+    final Map<String, double> wastedByClan = {};
+    for (final u in serverUsers) {
+      if (u.clanId.isNotEmpty && u.weeklyWastedCo2Kg > 0) {
+        wastedByClan[u.clanId] = (wastedByClan[u.clanId] ?? 0.0) + u.weeklyWastedCo2Kg;
+      }
+    }
+    for (final du in demoUsers) {
+      if (du.clanId.isNotEmpty && du.weeklyWastedCo2Kg > 0) {
+        wastedByClan[du.clanId] = (wastedByClan[du.clanId] ?? 0.0) + du.weeklyWastedCo2Kg;
+      }
+    }
+    if (me != null && me!.clanId.isNotEmpty && me!.weeklyWastedCo2Kg > 0) {
+      wastedByClan[me!.clanId] = (wastedByClan[me!.clanId] ?? 0.0) + me!.weeklyWastedCo2Kg;
+    }
+
+    final list = clans.map((c) {
+      final totalWasted = max(c.weeklyWastedCo2Kg, wastedByClan[c.id] ?? 0.0);
+      return c.copyWith(weeklyWastedCo2Kg: totalWasted);
+    }).toList();
+
+    list.sort((a, b) {
+      final w = b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg);
+      if (w != 0) return w;
+      final p = a.weeklyPoints.compareTo(b.weeklyPoints);
+      if (p != 0) return p;
+      final n = a.name.compareTo(b.name);
+      return n != 0 ? n : a.id.compareTo(b.id);
+    });
+
+    return list;
+  }
 
   List<AppUser> shameBoard() {
     final Map<String, AppUser> deduped = {};

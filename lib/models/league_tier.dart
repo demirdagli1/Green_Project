@@ -23,8 +23,11 @@ class LeagueTier {
   });
 
   /// Bireysel lig PNG logo yolu (Logolar/logo-bireysel/lig-bireysel-1.png ... 6.png).
-  /// Klan ligleri için kullanılmaz.
   String get individualAssetPath => 'Logolar/logo-bireysel/lig-bireysel-$tierNumber.png';
+
+  /// Klan lig PNG logo yolu (Logolar/logo-klan/logo-klan-1.png ... 6.png).
+  String get clanAssetPath => 'Logolar/logo-klan/logo-klan-$tierNumber.png';
+  static const String clanBaseAssetPath = 'Logolar/logo-klan/logo-klan-base.png';
 
   static const List<LeagueTier> allTiers = [
     LeagueTier(

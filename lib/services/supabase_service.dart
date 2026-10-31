@@ -352,6 +352,39 @@ class SupabaseService extends ChangeNotifier {
             } finally {
               _isEchoSuppressed = false;
             }
+          } else {
+            // Canlı diğer kullanıcı güncellemeleri (hibiscus vb.)
+            final idx = store.serverUsers.indexWhere((u) => (u.serverUserId ?? u.id) == uid);
+            if (idx >= 0) {
+              final old = store.serverUsers[idx];
+              store.serverUsers[idx] = old.copyWith(
+                weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? old.weeklyPoints,
+                allTimePoints: (rec['all_time_points'] as num?)?.toInt() ?? old.allTimePoints,
+                todaySteps: (rec['today_steps'] as num?)?.toInt() ?? old.todaySteps,
+                username: rec['nickname'] as String? ?? old.username,
+                equippedAvatar: rec['avatar_url'] as String? ?? old.equippedAvatar,
+                equippedPet: rec['pet_slug'] as String? ?? old.equippedPet,
+                equippedFrame: rec['frame_slug'] as String? ?? old.equippedFrame,
+              );
+            } else {
+              store.serverUsers.add(AppUser(
+                id: uid,
+                deviceId: 'SRV-$uid',
+                serverUserId: uid,
+                username: rec['nickname'] as String? ?? 'Gezgin',
+                clanId: Clan.sqlToId((rec['clan_id'] as num?)?.toInt() ?? 1),
+                clanName: '',
+                isDemo: false,
+                todaySteps: (rec['today_steps'] as num?)?.toInt() ?? 0,
+                weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? 0,
+                allTimePoints: (rec['all_time_points'] as num?)?.toInt() ?? 0,
+                streakDays: (rec['streak_days'] as num?)?.toInt() ?? 0,
+                equippedAvatar: rec['avatar_url'] as String? ?? 'default_avatar',
+                equippedFrame: rec['frame_slug'] as String? ?? 'none',
+                equippedPet: rec['pet_slug'] as String? ?? 'none',
+              ));
+            }
+            store.commitDirect();
           }
         },
       );
@@ -504,6 +537,16 @@ class SupabaseService extends ChangeNotifier {
               itemDone = (res is Map && (res['ok'] == true || res['duplicate'] == true));
               break;
 
+            case 'record_bus_trip':
+              final res = await gw.rpc('rpc_record_bus_trip', params: item.payload);
+              itemDone = (res is Map && (res['ok'] == true || res['duplicate'] == true));
+              break;
+
+            case 'send_shame_message':
+              final res = await gw.rpc('rpc_send_shame_message', params: item.payload);
+              itemDone = (res is Map && (res['ok'] == true || res['duplicate'] == true));
+              break;
+
             case 'buy_shop_item':
               final res = await gw.rpc('rpc_buy_shop_item', params: item.payload);
               itemDone = (res is Map && res['ok'] == true);
@@ -535,13 +578,18 @@ class SupabaseService extends ChangeNotifier {
           if (itemDone) {
             await ob.markCompleted(item.id);
           } else {
-            await ob.markFailed(item.id, 'Sunucu işlemi reddetti');
+            await ob.markFailed(item.id, 'Sunucu işlemi reddetti', forceQuarantine: false);
           }
         } catch (e) {
-          debugPrint('[SupabaseService] Outbox işlem hatası (${item.actionType}): $e');
-          await ob.markFailed(item.id, e.toString());
-          // Ağ hatasında sunucuyu boğmamak için dur
-          break;
+          final errStr = e.toString();
+          debugPrint('[SupabaseService] Outbox işlem hatası (${item.actionType}): $errStr');
+          final isPerm = SupabaseOutbox.isPermanentError(errStr);
+          await ob.markFailed(item.id, errStr, forceQuarantine: isPerm);
+          if (!isPerm) {
+            // Yalnızca geçici ağ hatalarında kuyruğu durdur
+            break;
+          }
+          // Zehirli paket karantinaya alındı; kuyruktaki diğer geçerli olaylara devam et
         }
       }
     } finally {
@@ -695,6 +743,65 @@ class SupabaseService extends ChangeNotifier {
   Future<void> _triggerOutboxFlush() async {
     if (AppStore.instance.loaded) {
       await processOutbox(AppStore.instance);
+    }
+  }
+
+  Future<void> recordBusTrip({
+    required String eventId,
+    required double distanceKm,
+    required int busScore,
+    required bool isShortPenalty,
+    String? explanation,
+  }) async {
+    if (_isEchoSuppressed) return;
+    await _outbox?.enqueue(
+      actionType: 'record_bus_trip',
+      eventId: eventId,
+      payload: {
+        'p_event_id': eventId,
+        'p_distance_km': distanceKm,
+        'p_bus_score': busScore,
+        'p_is_short_penalty': isShortPenalty,
+        'p_explanation': explanation,
+      },
+    );
+    unawaited(_triggerOutboxFlush());
+  }
+
+  Future<Map<String, dynamic>> sendShameMessage({
+    required String targetUserId,
+    required String message,
+  }) async {
+    final gw = _gateway;
+    final idempotencyKey = 'shame_${DateTime.now().microsecondsSinceEpoch}';
+    if (gw == null) {
+      return {'ok': true, 'message': 'Yerel oturumda utanç mesajı kaydedildi.'};
+    }
+    try {
+      final res = await gw.rpc('rpc_send_shame_message', params: {
+        'p_target_id': targetUserId,
+        'p_message': message,
+        'p_idempotency_key': idempotencyKey,
+      });
+      if (res is Map) {
+        return Map<String, dynamic>.from(res);
+      }
+      return {'ok': true, 'message': 'Mesaj iletildi.'};
+    } catch (e) {
+      debugPrint('[SupabaseService] sendShameMessage hatası: $e');
+      return {'ok': false, 'message': e.toString()};
+    }
+  }
+
+  /// Uygulama arka plandan ön plana döndüğünde çağrılır (Lifecycle Resume).
+  Future<void> onAppResume(AppStore store) async {
+    final ok = await ensureSession();
+    if (ok) {
+      if (_realtimeChannel == null) {
+        setupRealtimeSubscriptions(store);
+      }
+      await fetchServerLeaderboard(store);
+      await processOutbox(store);
     }
   }
 

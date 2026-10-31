@@ -128,6 +128,8 @@ void main() {
     await t.pumpAndSettle();
     final btn = find.text('500 🪙');
     await t.scrollUntilVisible(btn, 200, scrollable: find.byType(Scrollable).last);
+    await t.drag(find.byType(Scrollable).last, const Offset(0, -100));
+    await t.pumpAndSettle();
     await t.tap(btn);
     await t.tap(btn, warnIfMissed: false);
     await t.pumpAndSettle();
