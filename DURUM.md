@@ -6,7 +6,7 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - Codex yönetir; ürün/test/SQL kodunu AGY Gemini 3.8 Flash High yazar. Tokenı koru, kısa ve sade konuş. Git yerel; **push yok**. Ayrıntılı kurallar: [AGENT_YONETIM.md](AGENT_YONETIM.md).
 - İndirme yok; kurulu Flutter/JDK/SDK ve çevrimdışı önbellekler kullanılır. Tek ağır test/derleme, Gradle tek worker/2 GB heap.
 - Kullanıcının `Düzenlemeler.txt` değişiklikleri korunuyor, yönetici commitine katılmadı.
-- Root bağlı cihaza `adb install -r releases/YeSilAdim-debug.apk` ile kurulum yapacaktır; AGY doğrudan cihaz kurulumu yapmaz.
+- Root bağlı cihazda `adb install -r releases/YeSilAdim-debug.apk` çalıştırdı: Success. Uygulama verileri silinmedi; MainActivity açma komutu gönderildi. Elle test kullanıcıya ait.
 
 ## Son tamamlanan teslim paketi (QR/NFC UI Kaldırma & 3 Sekmeli Shell)
 - **Kullanıcı düzeltmesi uygulandı:** Kullanıcıya açık QR/NFC okutma arayüzü tamamen kaldırıldı. Bottom navigation yalnız 3 öğe ve 3 sayfadan oluşur:
@@ -58,3 +58,5 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - `761a58c`: profil yeniden deneme, klan etkileşimleri ve GM bildirim düğmesi.
 - `2336226`: doğrulanmış canlı GM bildirim migration10 ve önceki teslim kaydı.
 - Kullanıcı artık bağlı telefona APK yüklenmesini açıkça istedi; kurulum yönetimini root yapar.
+
+- `bdbffba`: QR/NFC ekranını kaldırma ve üç sekmeli gezinme; yeni APK bağlı cihaza başarıyla kuruldu.
