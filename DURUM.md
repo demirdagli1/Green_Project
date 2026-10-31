@@ -117,3 +117,10 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - `e349e1e`: ortak listeler yalnız Supabase snapshotlarından okunuyor; demo/yerel me karışımı kaldırıldı. Tam141 ve son26 hedefli test geçti.
 - Aynı son APK bağlı iki telefona adb install --no-streaming -r ile başarıyla yüklendi ve MainActivity açıldı. Kullanıcının elle iki ekran karşılaştırması bekleniyor; kurulum, eşzamanlı veri doğruluğu testi değildir.
 - PC panelindeki seçili kullanıcı/yenileme tutarlılığı AGY ayrı görevidir; yalnız tools/universal_gm/index.html düzenleniyor.
+
+## Utanç mesajı kota sıfırlaması
+- Canlı sunucu kontrolünde yönetici sıfırlamaları başarılı ve incelenen gönderici kotaları 0 idi; telefonun kalıcı yerel kota kontrolü yine de mesaj penceresini açtırmıyordu. Hata düzeltme öncesi widget testinde yeniden üretildi.
+- Yerel kota ve eski yerel bakiye ön engelleri kaldırıldı. Gerçek gönderimde kota ve 10 altın kontrolünü sunucu atomik RPC yapar; yalnızca başarılı yanıttaki `remaining_gold` gösterime uygulanır, geçersiz sunucu yanıtı başarı sayılmaz. Yönetici sıfırlamasında panelde mesajı gönderecek kullanıcı seçilmelidir.
+- Utanç tablosundaki sunucu demo kayıtları `[DEMO]` diye etiketlenir ve canlı mesaj gönderilemeyeceği açıklanır. Son incelemede 15 utanç kaydının tümü demo, gerçek kullanıcı kaydı ise 0 idi; adım/puan değişikliği utanç sırasını değiştirmez, bunun için yetkili araç/taksi cezası gerekir. İlk 10 + kişinin sırası penceresi korunur.
+- İlgili 39 test ve Dart analizi başarılı. Testte yerel eski kota, sunucu kota reddi, sıfırlama sonrası yeni işlem anahtarıyla kabul, bakiye ve geçersiz yanıt kontrol edildi. Gerçek cihazda mesaj teslimi henüz test edilmedi.
+- Son çevrimdışı Gradle derlemesi başarılı; `releases/YeSilAdim-debug.apk` 173.961.603 bayt, SHA-256 `37600f4310083fbd1edb895a7c55a4188de5a47f5c09dfed6f99b8afa029013a`, checksum doğrulandı. Bu yeni APK'nın kurulumu root tarafından yürütülür.

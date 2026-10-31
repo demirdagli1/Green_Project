@@ -582,7 +582,7 @@ class HomeScreen extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            NameMasker.maskShameName(list[i].username),
+                            '${NameMasker.maskShameName(list[i].username)}${list[i].isDemo ? ' [DEMO]' : ''}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),

@@ -3,12 +3,36 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:green_project/main.dart';
+import 'package:green_project/models/app_user.dart';
+import 'package:green_project/screens/leaderboard/leaderboard_screen.dart';
 import 'package:green_project/screens/shop_profile/shop_profile_screen.dart';
 import 'package:green_project/services/app_store.dart';
 import 'package:green_project/services/hardware_bridge.dart';
 import 'package:green_project/services/hub.dart';
 import 'package:green_project/services/sensor_controller.dart';
 import 'package:green_project/services/storage.dart';
+import 'package:green_project/services/supabase_service.dart';
+import 'supabase_integration_test.dart' show TestMockSupabaseGateway;
+
+class _QuotaGateway extends TestMockSupabaseGateway {
+  _QuotaGateway() : super(userId: 'sender-id');
+  bool quotaUsed = false;
+  int balance = 40;
+  bool malformedResponse = false;
+  final keys = <String>[];
+
+  @override
+  Future<dynamic> rpc(String functionName, {Map<String, dynamic>? params}) async {
+    if (functionName != 'rpc_send_shame_message') return super.rpc(functionName, params: params);
+    keys.add(params!['p_idempotency_key'] as String);
+    if (malformedResponse) return [];
+    if (quotaUsed) return {'ok': false, 'message': 'Sunucu kotası dolu'};
+    if (balance < 10) return {'ok': false, 'message': 'Yetersiz altın'};
+    quotaUsed = true;
+    balance -= 10;
+    return {'ok': true, 'remaining_gold': balance, 'message': 'Sunucu kabul etti'};
+  }
+}
 
 class _DelayedHardwareBridge implements HardwareBridge {
   final StreamController<Map<String, dynamic>> controller = StreamController.broadcast();
@@ -68,6 +92,58 @@ Future<void> onboard(WidgetTester t, AppStore store, {String name = 'Ayşe'}) as
 }
 
 void main() {
+  testWidgets('Yerel eski kota kaydı sunucu sıfırlamasından sonra gönderim penceresini engellemez', (t) async {
+    final gateway = _QuotaGateway();
+    final service = SupabaseService(gateway: gateway);
+    Hub.supabase = service;
+    addTearDown(() { service.dispose(); Hub.supabase = SupabaseService(); });
+    final store = AppStore(backend: MemoryStore(), clock: () => DateTime.utc(2026, 10, 26, 9));
+    await store.load();
+    store.register(deviceId: 'sender', name: 'Gönderici', clanName: 'KTÜ Kanuni');
+    store.me = store.me!.copyWith(serverUserId: 'sender-id', goldCoins: 40);
+    store.serverProfile = store.me;
+    store.markShameMessageSent();
+    store.isServerShameLoaded = true;
+    store.serverShameUsers = [const AppUser(id: 'target-id', deviceId: 'server-target',
+      serverUserId: 'target-id', username: 'Hedef', clanId: '', clanName: '',
+      weeklyCarTaxiTrips: 1, weeklyWastedCo2Kg: 1)];
+    AppStore.instance = store;
+    await t.pumpWidget(const MaterialApp(home: LeaderboardScreen(initialShame: true)));
+    await t.tap(find.text('Hed***'));
+    await t.pumpAndSettle();
+    expect(find.text('🎯 Utanç Dürtmesi'), findsOneWidget);
+    expect(find.text('Günlük Kota Doldu'), findsNothing);
+    await t.enterText(find.byType(TextField), 'Mesaj');
+    await t.tap(find.text('Gönder (10 🪙)'));
+    await t.pumpAndSettle();
+    expect(gateway.balance, 30);
+    expect(store.serverProfile!.goldCoins, 30);
+    await t.tap(find.text('Hed***'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), 'Yeniden');
+    await t.tap(find.text('Gönder (10 🪙)'));
+    await t.pumpAndSettle();
+    expect(gateway.balance, 30);
+    expect(gateway.keys, hasLength(2));
+    gateway.quotaUsed = false; // Yönetici sunucuda göndericinin kotasını sıfırlar.
+    await t.tap(find.text('Hed***'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), 'Sıfırlandı');
+    await t.tap(find.text('Gönder (10 🪙)'));
+    await t.pumpAndSettle();
+    expect(gateway.balance, 20);
+    expect(store.serverProfile!.goldCoins, 20);
+    expect(gateway.keys.toSet(), hasLength(3));
+    gateway.malformedResponse = true;
+    await t.tap(find.text('Hed***'));
+    await t.pumpAndSettle();
+    await t.enterText(find.byType(TextField), 'Geçersiz yanıt');
+    await t.tap(find.text('Gönder (10 🪙)'));
+    await t.pumpAndSettle();
+    expect(gateway.balance, 20);
+    expect(store.serverProfile!.goldCoins, 20);
+    expect(gateway.keys.toSet(), hasLength(4));
+  });
   testWidgets('onboarding zorunlu: boş giriş kabul edilmez, sonra ana sayfa gerçek (sıfır) verilerle açılır', (t) async {
     final store = await boot(t);
     expect(find.text('Hoş Geldin!\nİsmin ne?'), findsOneWidget);
@@ -96,9 +172,9 @@ void main() {
     expect(find.text('🏆 Gurur Tablosu'), findsOneWidget);
     await t.tap(find.text('🚨 Utanç'));
     await t.pumpAndSettle();
-    expect(find.text('Pel***'), findsOneWidget);
+    expect(find.text('Pel*** [DEMO]'), findsOneWidget);
     expect(find.text('Pelinsu Yılmaz'), findsNothing);
-    expect(find.text('Oğu***'), findsOneWidget);
+    expect(find.text('Oğu*** [DEMO]'), findsOneWidget);
     await t.tap(find.text('Klan'));
     await t.pumpAndSettle();
     await t.tap(find.text('🏆 Gurur'));

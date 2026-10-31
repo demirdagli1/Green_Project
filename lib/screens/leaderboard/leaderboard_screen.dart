@@ -500,8 +500,8 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         backgroundColor: Color(0xFFFCA5A5),
         child: Text('🚕', style: TextStyle(fontSize: 12)),
       ),
-      title: '${NameMasker.maskShameName(u.username)}${isMe ? ' (Sen)' : ''}',
-      sub: '${u.weeklyCarTaxiTrips} araba/taksi yolculuğu • Dokun: Dürt',
+      title: '${NameMasker.maskShameName(u.username)}${u.isDemo ? ' [DEMO]' : ''}${isMe ? ' (Sen)' : ''}',
+      sub: '${u.weeklyCarTaxiTrips} araba/taksi yolculuğu • ${u.isDemo ? 'Demo kullanıcıya mesaj gönderilemez' : 'Dokun: Dürt'}',
       trail: '${u.weeklyWastedCo2Kg.toStringAsFixed(1)} kg CO₂',
       onTap: () => _openShamePokeDialog(context, u, store),
     );
@@ -602,44 +602,6 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
       return;
     }
 
-    if (store.hasSentShameMessageToday) {
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Günlük Kota Doldu'),
-          content: const Text(
-            'Bugünlük utanç mesajı hakkınızı kullandınız (Europe/Istanbul gününde toplam en fazla 1 gönderim).',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tamam'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
-    if ((store.me?.goldCoins ?? 0) < 10) {
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text('Yetersiz Altın'),
-          content: Text(
-            'Utanç mesajı göndermek için 10 altın gerekir. Mevcut bakiyeniz: ${store.me?.goldCoins ?? 0} altın.',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tamam'),
-            ),
-          ],
-        ),
-      );
-      return;
-    }
-
     final msgCtrl = TextEditingController();
     bool isSending = false;
 
@@ -706,9 +668,19 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         );
 
                         if (res['ok'] == true) {
-                          // Yalnızca sunucu onayladığında 10 altın düşülür ve günlük kota kaydedilir
-                          store.me = store.me!.copyWith(goldCoins: store.me!.goldCoins - 10);
+                          final remainingGold = res['remaining_gold'];
+                          if (remainingGold is num) {
+                            if (store.me != null) {
+                              store.me = store.me!.copyWith(goldCoins: remainingGold.toInt());
+                            }
+                            if (store.serverProfile != null) {
+                              store.serverProfile = store.serverProfile!.copyWith(goldCoins: remainingGold.toInt());
+                            }
+                          }
                           store.markShameMessageSent();
+                          if (remainingGold is! num) {
+                            await Hub.supabase.fetchServerProfile(store);
+                          }
                         }
 
                         if (mounted) {

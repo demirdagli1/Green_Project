@@ -899,7 +899,7 @@ class SupabaseService extends ChangeNotifier {
       if (res is Map) {
         return Map<String, dynamic>.from(res);
       }
-      return {'ok': true, 'message': 'Mesaj iletildi.'};
+      return {'ok': false, 'message': 'Sunucudan geçersiz yanıt alındı; mesaj durumu doğrulanamadı.'};
     } catch (e) {
       debugPrint('[SupabaseService] sendShameMessage hatası: $e');
       return {'ok': false, 'message': e.toString()};
