@@ -5,6 +5,7 @@ class AppUser {
   final String clanId;
   final String clanName;
   final bool isDemo;
+  final String? serverUserId;
   final int todaySteps;
   final int weeklyPoints;
   final int allTimePoints;
@@ -26,6 +27,7 @@ class AppUser {
     required this.clanId,
     required this.clanName,
     this.isDemo = false,
+    this.serverUserId,
     this.todaySteps = 0,
     this.weeklyPoints = 0,
     this.allTimePoints = 0,
@@ -59,6 +61,7 @@ class AppUser {
     String? photoPath,
     bool clearPhoto = false,
     String? bio,
+    String? serverUserId,
   }) {
     return AppUser(
       id: id,
@@ -67,6 +70,7 @@ class AppUser {
       clanId: clanId ?? this.clanId,
       clanName: clanName ?? this.clanName,
       isDemo: isDemo,
+      serverUserId: serverUserId ?? this.serverUserId,
       todaySteps: todaySteps ?? this.todaySteps,
       weeklyPoints: weeklyPoints ?? this.weeklyPoints,
       allTimePoints: allTimePoints ?? this.allTimePoints,
@@ -90,6 +94,7 @@ class AppUser {
         'clan_id': clanId,
         'clan_name': clanName,
         'is_demo': isDemo,
+        'server_user_id': serverUserId,
         'today_steps': todaySteps,
         'weekly_points': weeklyPoints,
         'all_time_points': allTimePoints,
@@ -112,6 +117,7 @@ class AppUser {
         clanId: j['clan_id'] as String? ?? '',
         clanName: j['clan_name'] as String? ?? '',
         isDemo: j['is_demo'] as bool? ?? false,
+        serverUserId: j['server_user_id'] as String?,
         todaySteps: (j['today_steps'] as num?)?.toInt() ?? 0,
         weeklyPoints: (j['weekly_points'] as num?)?.toInt() ?? 0,
         allTimePoints: (j['all_time_points'] as num?)?.toInt() ?? 0,

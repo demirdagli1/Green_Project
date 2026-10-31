@@ -5,10 +5,38 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
 ## 🚀 Proje Durumu ve Özet
 
 - **Statik Kod Analizi:** `dart analyze` ile 0 hata, 0 uyarı
-- **Test Kapsamı:** **103 / 103 test başarılı** (`rules_test`, `store_test`, `ui_flow_test`, `gm_panel_test`, `leaderboard_window_test`, `phase_b_c_test`, `phase_d_test`)
-- **Derleme Modu:** Tamamen çevrimdışı (offline Gradle, JDK 17, AGP, `--no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m"`)
-- **Teslim Edilen APK:** `releases/YeSilAdim-debug.apk` (SHA-256: `d7a2359c58a3260c7449be7622e69026db6e1ea292d3f4955b51cae92ecfd9a4`)
+- **Test Kapsamı:** **107 / 107 test başarılı** (`rules_test`, `store_test`, `ui_flow_test`, `gm_panel_test`, `leaderboard_window_test`, `phase_b_c_test`, `phase_d_test`, `mockup_migration_test`)
+- **Derleme Modu:** Tamamen çevrimdışı (offline Gradle, JDK 17, AGP, `--no-daemon --max-workers=1`)
+- **Teslim Edilen APK:** `releases/YeSilAdim-debug.apk` (SHA-256: `59553921b3f9bc2ef427d3ea41697ac22669f539c513a652fd80d5d61b2f124b`)
 - **Fiziksel Cihaz Uyumluluğu:** Samsung SM-A346E (Android 16 / API 36)
+- **Eşleme & Sözleşme Raporu:** [MOCKUP_ESLEME.md](MOCKUP_ESLEME.md)
+
+---
+
+## 🎨 Mockup & Bireysel Lig Logoları Entegrasyonu
+
+1. **Bireysel Lig Logoları (1-6 PNG):**
+   - `Logolar/logo-bireysel/` altındaki 6 PNG (`lig-bireysel-1.png` ... `lig-bireysel-6.png`) kod-native asset olarak eklendi.
+   - Ortak `IndividualLeagueBadge` bileşeni ile `BoxFit.contain` kullanılarak oran korundu; satır okunurluğu ve taşma engeli sağlandı.
+   - Ana sayfa bireysel lig kartı ve Gurur Tablosu kullanıcı satırlarında kullanıldı.
+   - Klan liglerine bireysel logolar atanmadı (klan görselleri henüz yoktur). Toplu `erasebg-transformed.png` kullanılmadı.
+
+2. **Yerel Seed Verisi (SQL Kaynağı):**
+   - `supabase_schema_ve_mockup_veriler.sql` şeması yerel seed referansı olarak kullanıldı (canlı DB yok, veritabanında çalıştırılmadı).
+   - 15 demo kullanıcı (Zeynep Kaya 1., Berkecan Taksi ve Pelinsu Yılmaz utanç tablosu vb.) yüklendi; 100'e tamamlamak için kullanıcı uydurulmadı.
+   - 11 klan deterministik kalıcı string ID (`clan_ktu_kanuni`, vb.) ile eşlendi; SQL dışı mevcut klan `clan_micro` (Yalnız Gezginler) ve kullanıcı klanları korundu.
+   - 6 transit durağı (`TRB-KTU-01` ... `ANK-EGO-411`) ve legacy `TRB-OF-204` aliası bağlandı.
+   - 8 aktif mağaza ürünü ve legacy ürün aliasları eşlendi.
+
+3. **Sürümlü Veri Yükseltmesi (Seed v3) & İdempotentlik:**
+   - Eski kurulumlardan geçişte gerçek kullanıcı profili (`me`), adı, biyografisi, fotoğraf yolu, adımları, streak'i, altınları ve klan katkıları korundu.
+   - SQL'deki `Sen (Efe)` kaydı `isDemo: true` olan bağımsız demo kullanıcısıdır; gerçek kullanıcının yerine geçmez.
+   - İkinci load ve restart işlemleri tamamen **idempotenttir**; gerçek veriler tekrar yükleme veya periyot kontrolüyle ezilmez.
+
+4. **Transit QR ve NFC Normalizasyonu:**
+   - QR payload'larındaki `?sig=...` demo parametresi ayıklanarak durak koduna indirgenir.
+   - Kolonlu ve kolonsuz NFC UID hex dizgileri durak koduna normalize edilir.
+   - QR ve NFC binişleri aynı durak kimliği üzerinde ortak 45 dakikalık cooldown kuralını paylaşır.
 
 ---
 
@@ -26,7 +54,7 @@ Yeşil Adım, sürdürülebilir kentsel hareketliliği (yürüme, bisiklet, topl
 
 3. **Toplu Taşıma (QR & NFC):**
    - Alt gezinme çubuğunda bağımsız sekme (`[0] QR/NFC`).
-   - Tek biniş için +3 puan ve sabit CO₂ tasarrufu; 45 dakikalık durak bazlı ortak cooldown kuralı.
+   - Tek biniş için +3 puan ve durak bazlı CO₂ tasarrufu; 45 dakikalık ortak cooldown kuralı.
 
 4. **Liderlik Tablosu & Gezinme (Aşama B):**
    - Yatay lig buton/filtre şeridi kaldırılmıştır.
@@ -90,7 +118,7 @@ dart analyze
 
 # Offline APK derleme (2GB Heap, tek worker):
 cd android
-./gradlew assembleDebug --offline --no-daemon --max-workers=1 -Dorg.gradle.jvmargs="-Xmx2048m"
+./gradlew assembleDebug --offline --no-daemon --max-workers=1
 
 # Cihaza veri koruyarak yükleme:
 adb install -r releases/YeSilAdim-debug.apk

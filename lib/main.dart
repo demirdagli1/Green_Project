@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,6 +13,7 @@ import 'services/hardware_bridge.dart';
 import 'services/hub.dart';
 import 'services/sensor_controller.dart';
 import 'services/storage.dart';
+import 'services/supabase_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +33,17 @@ Future<void> main() async {
 
   final token = await loadOrCreateGmToken();
   await gmServer.start(initialToken: token);
+
+  if (SupabaseConfig.isConfigured) {
+    try {
+      await Hub.supabase.initialize(storage: PrefsStore());
+      if (store.hasProfile) {
+        unawaited(Hub.supabase.startSync(store));
+      }
+    } catch (e) {
+      debugPrint('[MAIN] Supabase init hatası: $e');
+    }
+  }
 
   runApp(const GreenProjectApp());
 }

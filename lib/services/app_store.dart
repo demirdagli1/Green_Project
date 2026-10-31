@@ -12,6 +12,7 @@ import 'activity_validation_service.dart';
 import 'auto_motion_engine.dart';
 import 'sensor_telemetry.dart';
 import 'storage.dart';
+import 'supabase_service.dart';
 
 /// Eylem sonucu. [ok] false ise durum/puan değişmemiştir.
 class ActionResult {
@@ -87,6 +88,7 @@ class AppStore extends ChangeNotifier {
   AppUser? me;
   List<AppUser> demoUsers = List.of(DemoData.users());
   List<Clan> clans = List.of(DemoData.clans());
+  List<AppUser> serverUsers = [];
   final Set<String> owned = {'default_avatar'};
   final Map<String, int> transitLast = {};
   final List<String> processed = [];
@@ -277,6 +279,7 @@ class AppStore extends ChangeNotifier {
     if (idx < 0) return const ActionResult(false, 'Klan bulunamadı.');
     me = AppUser(id: 'me_$deviceId', deviceId: deviceId, username: n, clanId: clans[idx].id, clanName: clans[idx].name);
     clans[idx] = clans[idx].copyWith(memberCount: clans[idx].memberCount + 1);
+    SupabaseService.instance.syncInitialProfile(this);
     _commit();
     return const ActionResult(true, 'Hoş geldin!');
   }
@@ -355,6 +358,14 @@ class AppStore extends ChangeNotifier {
     me = u.copyWith(todaySteps: newTotal, streakDays: streak);
     _award(pts);
     if (pts > 0) _note('🎯 +$pts puan', '$newTotal adıma ulaştın.', demo: demo);
+    if (!demo && delta > 0) {
+      SupabaseService.instance.recordSteps(
+        stepCount: delta,
+        distanceKm: delta * 0.00075,
+        pointsEarned: pts,
+        co2SavedKg: 0.0,
+      );
+    }
     _commit();
     return ActionResult(true, pts > 0 ? '+$pts puan' : 'Adım eklendi', points: pts);
   }
@@ -583,6 +594,12 @@ class AppStore extends ChangeNotifier {
     transitLast[code] = now.millisecondsSinceEpoch;
     _award(stop.pointsReward, co2: stop.co2SavingKg);
     _note('🚌 Biniş onaylandı ($source)', '${stop.name}: +${stop.pointsReward} puan, ${stop.co2SavingKg.toStringAsFixed(2)} kg CO₂ önlendi.');
+    SupabaseService.instance.recordTransit(
+      stopCode: stop.code,
+      verificationMethod: source,
+      pointsEarned: stop.pointsReward,
+      co2SavedKg: stop.co2SavingKg,
+    );
     _commit();
     return ActionResult(true, '+${stop.pointsReward} puan', points: stop.pointsReward, co2Kg: stop.co2SavingKg);
   }
@@ -684,14 +701,50 @@ class AppStore extends ChangeNotifier {
       case BikeStatus.accepted:
         _award(v.points, co2: v.co2SavedKg);
         _note('🚴 Bisiklet tamamlandı', v.message, demo: demo);
+        if (!demo) {
+          SupabaseService.instance.recordBike(
+            tripId: tripId,
+            distanceKm: distanceKm,
+            avgSpeedKmh: avgSpeedKmh,
+            maxSpeedKmh: maxSpeedKmh,
+            accelVariance: fastAccelVariance ?? 0.0,
+            pointsEarned: v.points,
+            co2SavedKg: v.co2SavedKg,
+            isSpoof: false,
+          );
+        }
         _commit();
         return ActionResult(true, v.message, points: v.points, co2Kg: v.co2SavedKg);
       case BikeStatus.carTaxiPenalty:
         _penalty(v.wastedCo2Kg);
         _note('🚨 Araba/taksi cezası', v.message, demo: demo);
+        if (!demo) {
+          SupabaseService.instance.recordVehiclePenalty(
+            tripId: tripId,
+            distanceKm: distanceKm,
+            wastedCo2Kg: v.wastedCo2Kg,
+            avgSpeedKmh: avgSpeedKmh,
+          );
+        }
         _commit();
         return ActionResult(false, v.message);
       case BikeStatus.rejectedSpeedSpoof:
+        _note('❌ Bisiklet reddedildi', v.message, demo: demo);
+        if (!demo) {
+          SupabaseService.instance.recordBike(
+            tripId: tripId,
+            distanceKm: distanceKm,
+            avgSpeedKmh: avgSpeedKmh,
+            maxSpeedKmh: maxSpeedKmh,
+            accelVariance: fastAccelVariance ?? 0.0,
+            pointsEarned: 0,
+            co2SavedKg: 0.0,
+            isSpoof: true,
+            rejectReason: v.message,
+          );
+        }
+        _commit();
+        return ActionResult(false, v.message);
       case BikeStatus.invalidData:
       case BikeStatus.insufficientData:
         _note('❌ Bisiklet reddedildi', v.message, demo: demo);
@@ -732,6 +785,14 @@ class AppStore extends ChangeNotifier {
     _mark(tripId);
     _penalty(v.wastedCo2Kg);
     _note('🚕 Yakalandın!', v.message, demo: demo);
+    if (!demo) {
+      SupabaseService.instance.recordVehiclePenalty(
+        tripId: tripId,
+        distanceKm: distanceKm ?? 0.0,
+        wastedCo2Kg: v.wastedCo2Kg,
+        avgSpeedKmh: avgSpeedKmh ?? 0.0,
+      );
+    }
     _commit();
     return ActionResult(true, v.message, co2Kg: v.wastedCo2Kg);
   }
@@ -778,6 +839,7 @@ class AppStore extends ChangeNotifier {
     if (DemoData.legacyItemAliases.containsKey(item.id)) owned.add(DemoData.legacyItemAliases[item.id]!);
     if (DemoData.itemToLegacyAliases.containsKey(item.id)) owned.add(DemoData.itemToLegacyAliases[item.id]!);
     _equip(item);
+    SupabaseService.instance.buyShopItem(item.id);
     _commit();
     return ActionResult(true, '${item.title} alındı.');
   }
@@ -786,6 +848,7 @@ class AppStore extends ChangeNotifier {
     if (me == null) return const ActionResult(false, 'Profil yok.');
     if (itemId == 'default_avatar') {
       me = me!.copyWith(equippedAvatar: 'default_avatar');
+      SupabaseService.instance.equipShopItem('default_avatar');
       _commit();
       return const ActionResult(true, 'Varsayılan avatar kuşanıldı.');
     }
@@ -793,6 +856,7 @@ class AppStore extends ChangeNotifier {
     if (item == null) return const ActionResult(false, 'Ürün yok.');
     if (!isItemOwned(itemId)) return const ActionResult(false, 'Ürün kilitli.');
     _equip(item);
+    SupabaseService.instance.equipShopItem(itemId);
     _commit();
     return const ActionResult(true, 'Kuşanıldı.');
   }
@@ -816,6 +880,7 @@ class AppStore extends ChangeNotifier {
       return const ActionResult(false, 'Biyografi en fazla 160 karakter olabilir.');
     }
     me = me!.copyWith(bio: trimmed);
+    SupabaseService.instance.updateBio(trimmed);
     _commit();
     return const ActionResult(true, 'Biyografi güncellendi.');
   }
@@ -829,6 +894,7 @@ class AppStore extends ChangeNotifier {
       return const ActionResult(true, 'Profil fotoğrafı kaldırıldı.');
     }
     me = me!.copyWith(photoPath: path);
+    SupabaseService.instance.uploadProfilePhoto(path);
     _commit();
     return const ActionResult(true, 'Profil fotoğrafı güncellendi.');
   }
@@ -894,7 +960,27 @@ class AppStore extends ChangeNotifier {
   }
 
   List<AppUser> rankedUsers({bool allTime = false}) {
-    final l = [if (me != null) me!, ...demoUsers];
+    final Map<String, AppUser> deduped = {};
+
+    // 1. Canlı sunucu kullanıcıları
+    for (final su in serverUsers) {
+      deduped[su.serverUserId ?? su.id] = su;
+    }
+
+    // 2. Demo kullanıcıları (Sunucu verisi yoksa veya demo kayıtları)
+    for (final du in demoUsers) {
+      if (!deduped.containsKey(du.id)) {
+        deduped[du.id] = du;
+      }
+    }
+
+    // 3. Kendi profilimiz (Sunucu ID'si veya yerel ID ile tekil olarak ekle)
+    if (me != null) {
+      final myKey = me!.serverUserId ?? me!.id;
+      deduped[myKey] = me!;
+    }
+
+    final l = deduped.values.toList();
     l.sort((a, b) {
       final c = allTime ? b.allTimePoints.compareTo(a.allTimePoints) : b.weeklyPoints.compareTo(a.weeklyPoints);
       if (c != 0) return c;
@@ -908,7 +994,22 @@ class AppStore extends ChangeNotifier {
       clans.where((c) => c.isEligibleForRanking).toList()..sort((a, b) => compareClans(a, b, hybrid: hybrid, allTime: allTime));
 
   List<AppUser> shameBoard() {
-    final l = [if (me != null) me!, ...demoUsers].where((u) => u.weeklyCarTaxiTrips > 0).toList();
+    final Map<String, AppUser> deduped = {};
+    for (final su in serverUsers) {
+      if (su.weeklyCarTaxiTrips > 0) {
+        deduped[su.serverUserId ?? su.id] = su;
+      }
+    }
+    for (final du in demoUsers) {
+      if (du.weeklyCarTaxiTrips > 0 && !deduped.containsKey(du.id)) {
+        deduped[du.id] = du;
+      }
+    }
+    if (me != null && me!.weeklyCarTaxiTrips > 0) {
+      final myKey = me!.serverUserId ?? me!.id;
+      deduped[myKey] = me!;
+    }
+    final l = deduped.values.toList();
     l.sort((a, b) {
       final c = b.weeklyWastedCo2Kg.compareTo(a.weeklyWastedCo2Kg);
       if (c != 0) return c;

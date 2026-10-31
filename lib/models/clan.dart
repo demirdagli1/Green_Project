@@ -16,6 +16,44 @@ class Clan {
   /// 5'ten az üyesi olan klan sıralamaya alınmaz (4 hariç, 5 dahil).
   bool get isEligibleForRanking => memberCount >= 5;
 
+  /// SQL tablosundaki tamsayı ID ile istemci klan ID eşlemesi.
+  static int? idToSql(String? clanId) {
+    if (clanId == null || clanId.isEmpty) return null;
+    final parsed = int.tryParse(clanId);
+    if (parsed != null) return parsed;
+    const map = {
+      'clan_ktu_kanuni': 1,
+      'clan_ktu_of': 2,
+      'clan_odtu': 3,
+      'clan_koc': 4,
+      'clan_sabanci': 5,
+      'clan_itu': 6,
+      'clan_ytu': 7,
+      'clan_gazi': 8,
+      'clan_ktu_dagcilik': 9,
+      'clan_sincan': 10,
+      'clan_kirikkale': 11,
+    };
+    return map[clanId];
+  }
+
+  static String sqlToId(int sqlId) {
+    const map = {
+      1: 'clan_ktu_kanuni',
+      2: 'clan_ktu_of',
+      3: 'clan_odtu',
+      4: 'clan_koc',
+      5: 'clan_sabanci',
+      6: 'clan_itu',
+      7: 'clan_ytu',
+      8: 'clan_gazi',
+      9: 'clan_ktu_dagcilik',
+      10: 'clan_sincan',
+      11: 'clan_kirikkale',
+    };
+    return map[sqlId] ?? 'clan_$sqlId';
+  }
+
   /// Hibrit formül: (Toplam Puan * 0.6) + (Üye Ortalaması * 50 * 0.4)
   /// [allTime] true ise allTimePoints üzerinden hesaplanır.
   double hybridScoreFor({bool allTime = false}) {

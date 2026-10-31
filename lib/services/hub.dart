@@ -3,6 +3,7 @@ import 'command_dispatcher.dart';
 import 'gm_server.dart';
 import 'hardware_bridge.dart';
 import 'sensor_controller.dart';
+import 'supabase_service.dart';
 
 /// Basit servis konumlandırıcı (main ve testler ayarlar).
 class Hub {
@@ -22,4 +23,9 @@ class Hub {
   static GmServer get gmServer =>
       _gmServer ??= GmServer(dispatcher: dispatcher, sensors: sensors);
   static set gmServer(GmServer s) => _gmServer = s;
+
+  static SupabaseService? _supabase;
+  static SupabaseService get supabase =>
+      _supabase ??= SupabaseService.instance;
+  static set supabase(SupabaseService s) => _supabase = s;
 }

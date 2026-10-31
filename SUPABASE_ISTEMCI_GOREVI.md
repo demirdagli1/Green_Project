@@ -1,5 +1,7 @@
 # İstemciyi canlı Supabase'e bağlama
 
+**En yeni root durumu:** Kullanıcı darpublicprofil/privatehesap modelini açıkça onayladı. Güvenli migration `green_project_initial_schema_safe` canlıya başarıyla uygulandı; securityadvisors boş. Son güvenli viewsözleşmesi SUPABASE_HAZIRLIK/SUPABASE_GUVENLI_DUZELTME içinde. Artık liveAPI ile kontrollü istemci doğrulaması yapılabilir. verification.sql globalresettesti kalıcıdeğişiklik nedeniyle engellendi, ayrıAGY sadece onu rollbackli hale getiriyor; canlıda globalreset/testtemizliği çalıştırma.
+
 Root güncellemesi: ilk migration otomatikgüvenlik incelemesinde reddedildi, hiçbirpublictablo oluşmadı (list_tables tekrarboş). BackendAGYşimdi privateusers/gold/device_id okumasını daraltıp güvenli publicprojection/view sözleşmesi hazırlıyor. SUPABASE_GUVENLI_DUZELTME.md/SUPABASE_HAZIRLIK.md sonhalini esas al; genel sıralamayı users.select('*') ile okumaya güvenme. Root daha güvenliSQLi aynıapply_migrationile uygulayacak, bypass yok. Cloudkodunu hazırla, canlışema yokken testbaşarısı uydurma.
 
 - Kullanıcı aynı APKyı3–4cihaza daha kuracak; gerçek ortak sunucu istiyor. Kod AGYde, root yalnız deploy/inceleme/Git yapar. FlashHigh, kısaçıktı. Telefonu elle kullanıcı test ediyor; otomatik gezinme yok. Gerekli otomatiktest/build offline tekworker2GBheap. Yeni paket/SDK indirme yok.

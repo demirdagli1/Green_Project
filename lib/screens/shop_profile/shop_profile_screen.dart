@@ -7,6 +7,7 @@ import '../../models/app_user.dart';
 import '../../models/shop_item.dart';
 import '../../services/app_store.dart';
 import '../../services/hub.dart';
+import '../../services/supabase_service.dart';
 import '../admin/admin_panel_screen.dart';
 
 class ShopProfileScreen extends StatelessWidget {
@@ -117,9 +118,10 @@ class ShopProfileScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Hub.store,
+      listenable: Listenable.merge([Hub.store, Hub.supabase]),
       builder: (context, _) {
         final store = Hub.store;
+        final sb = Hub.supabase;
         final u = store.me;
         if (u == null) return const SizedBox.shrink();
 
@@ -217,6 +219,81 @@ class ShopProfileScreen extends StatelessWidget {
                       'Yoldaş: ${readableEquipped(store, u.equippedPet, ShopCategory.pet)}',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 11, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Supabase Canlı Bağlantı ve Senkronizasyon Durum Kartı
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: sb.isConnected
+                        ? AppColors.emeraldGreen.withValues(alpha: 0.3)
+                        : (sb.status == SupabaseSyncStatus.offline ? Colors.amber.shade300 : Colors.red.shade200),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      sb.isConnected ? Icons.cloud_done : (sb.status == SupabaseSyncStatus.connecting ? Icons.cloud_sync : Icons.cloud_off),
+                      size: 22,
+                      color: sb.isConnected
+                          ? AppColors.emeraldGreen
+                          : (sb.status == SupabaseSyncStatus.offline ? Colors.amber.shade800 : AppColors.fireRed),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Wrap(
+                            crossAxisAlignment: WrapCrossAlignment.center,
+                            spacing: 6,
+                            children: [
+                              Text(
+                                sb.isConnected
+                                    ? 'Supabase: Canlı'
+                                    : (sb.status == SupabaseSyncStatus.connecting
+                                        ? 'Supabase: Bağlanıyor…'
+                                        : 'Supabase: Çevrimdışı'),
+                                style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+                              ),
+                              if (sb.outbox != null && sb.outbox!.pendingCount > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.amber.shade100,
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    '${sb.outbox!.pendingCount} bekliyor',
+                                    style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: Colors.amber.shade900),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          Text(
+                            u.serverUserId != null
+                                ? 'Anonim Oturum: ${u.serverUserId!.substring(0, 8)}…'
+                                : (sb.lastError ?? 'Canlı bağlantı bekleniyor, yerel önbellek etkin.'),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: sb.lastError != null ? AppColors.fireRed : AppColors.textMuted,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.refresh, size: 18),
+                      tooltip: 'Senkronize Et',
+                      onPressed: () => sb.startSync(store),
                     ),
                   ],
                 ),
