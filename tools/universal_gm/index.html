@@ -110,7 +110,11 @@
       <div>
         <div class="card">
           <h2>👥 Kullanıcı Seçimi</h2>
-          <button class="btn-sm" style="margin-bottom: 14px; width: 100%;" onclick="loadUsersList()">🔄 Kullanıcı Listesini Yenile</button>
+          <button class="btn-sm" style="margin-bottom: 8px; width: 100%;" onclick="loadUsersList()">🔄 Kullanıcı Listesini Yenile</button>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 11px; color: var(--text-muted);">
+            <span id="loadStatus">Hazır</span>
+            <span id="lastUpdatedText">Son yenilenme: Henüz yapılmadı</span>
+          </div>
           <div id="usersListContainer" style="max-height: 520px; overflow-y: auto;">
             <p style="color: var(--text-muted); font-size: 12px;">Kullanıcılar yükleniyor...</p>
           </div>
@@ -140,34 +144,34 @@
           <label>Adım Ekle (1 - 100.000) / Ayarla (0 - 1.000.000)</label>
           <div class="action-row">
             <input type="number" id="inStepAdd" value="1000" placeholder="Eklenecek adım">
-            <button class="gm-action-btn" onclick="executeAction('add_steps', { count: parseInt(document.getElementById('inStepAdd').value) })">+ Adım Ekle</button>
+            <button class="gm-action-btn" onclick="actionAddSteps()">+ Adım Ekle</button>
             <input type="number" id="inStepSet" placeholder="Toplam yap">
-            <button class="btn-warning gm-action-btn" onclick="executeAction('set_steps', { total: parseInt(document.getElementById('inStepSet').value) })">Ayarla</button>
+            <button class="btn-warning gm-action-btn" onclick="actionSetSteps()">Ayarla</button>
           </div>
 
           <!-- ALTIN YÖNETİMİ -->
           <label>Altın Ekle / Ayarla (-100.000 - +100.000)</label>
           <div class="action-row">
             <input type="number" id="inGoldAdd" value="500" placeholder="Eklenecek altın">
-            <button class="btn-success gm-action-btn" onclick="executeAction('add_gold', { amount: parseInt(document.getElementById('inGoldAdd').value) })">+ Altın Ekle</button>
+            <button class="btn-success gm-action-btn" onclick="actionAddGold()">+ Altın Ekle</button>
             <input type="number" id="inGoldSet" placeholder="Toplam yap">
-            <button class="btn-warning gm-action-btn" onclick="executeAction('set_gold', { total: parseInt(document.getElementById('inGoldSet').value) })">Ayarla</button>
+            <button class="btn-warning gm-action-btn" onclick="actionSetGold()">Ayarla</button>
           </div>
 
           <!-- PUAN YÖNETİMİ -->
           <label>Haftalık Puan Ekle / Çıkar (Klan ve Bireysel, -10.000 - +10.000)</label>
           <div class="action-row">
             <input type="number" id="inPointAdd" value="50" placeholder="Eklenecek puan">
-            <button class="gm-action-btn" onclick="executeAction('add_points', { points: parseInt(document.getElementById('inPointAdd').value) })">+ Puan Ekle</button>
+            <button class="gm-action-btn" onclick="actionAddPoints()">+ Puan Ekle</button>
           </div>
 
           <!-- STREAK YÖNETİMİ -->
           <label>Seri (Streak) Gün Ekle / Ayarla (1 - 365)</label>
           <div class="action-row">
             <input type="number" id="inStreakAdd" value="1" placeholder="Eklenecek gün">
-            <button class="gm-action-btn" onclick="executeAction('add_streak', { days: parseInt(document.getElementById('inStreakAdd').value) })">+ Gün Ekle</button>
+            <button class="gm-action-btn" onclick="actionAddStreak()">+ Gün Ekle</button>
             <input type="number" id="inStreakSet" placeholder="Seri günü yap">
-            <button class="btn-warning gm-action-btn" onclick="executeAction('set_streak', { days: parseInt(document.getElementById('inStreakSet').value) })">Ayarla</button>
+            <button class="btn-warning gm-action-btn" onclick="actionSetStreak()">Ayarla</button>
           </div>
 
           <!-- UTANÇ KOTASI SIFIRLAMA -->
@@ -187,10 +191,23 @@
             </button>
           </div>
 
+          <!-- UTANÇ PANOSU YÖNETİCİ TEST BİLDİRİMİ -->
           <label>📣 Utanç Panosu Yönetici Test Bildirimi</label>
-          <p style="font-size: 12px; color: var(--text-muted);">Seçili gerçek kullanıcıya yönetici test bildirimi gönderir. Bu, oyuncunun 10 altınlık ve günlük 1 adet sınırlı utanç mesajı değildir; altın harcamaz.</p>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">Seçili gerçek kullanıcıya yönetici test bildirimi gönderir. Bu, oyuncunun 10 altınlık ve günlük 1 adet sınırlı utanç mesajı değildir; altın harcamaz.</p>
           <div class="action-row">
             <button class="btn-danger gm-action-btn" style="flex: 1;" onclick="sendShameTestNotification()">📣 Seçili Kullanıcıya Utanç Test Bildirimi Gönder</button>
+          </div>
+
+          <!-- OYUNCU UTANÇ DÜRTME MESAJI TESTİ (AYRI VE AÇIK) -->
+          <label>💬 Oyuncu Utanç Dürtme Mesajı Testi (rpc_send_shame_message)</label>
+          <p style="font-size: 12px; color: var(--text-muted); margin-bottom: 6px;">
+            Oyuncu simülasyonu: Gönderici oturumundan <strong>10 altın</strong> düşer, <strong>günde en fazla 1 adet</strong> gönderim kotası işlenir, mesaj en fazla <strong>50 karakter</strong>dir. Demo kullanıcıya veya kendine gönderilemez.
+          </p>
+          <div class="action-row">
+            <input type="text" id="inUserShameMsg" maxlength="50" placeholder="Örn: Yürümek varken taksi mi? (En fazla 50 karakter)" style="flex: 2;">
+            <button class="btn-warning gm-action-btn" style="flex: 1;" onclick="sendUserShameMessageTest()">
+              💬 Oyuncu Utanç Mesajı Gönder (10 Altın, 1/Gün Kota)
+            </button>
           </div>
 
           <!-- RAHATSIZ EDİCİ BİLDİRİM / DÜRTME -->
@@ -224,6 +241,9 @@
     let selectedUserId = null;
     let selectedUserObj = null;
     let cachedUsers = [];
+    let usersRequestSeq = 0;
+    let selectionSeq = 0;
+    let actionInFlight = false;
 
     function escapeHtml(str) {
       if (str === null || str === undefined) return '';
@@ -245,7 +265,7 @@
 
     function setGmButtonsEnabled(enabled) {
       document.querySelectorAll('.gm-action-btn').forEach(btn => {
-        btn.disabled = !enabled;
+        btn.disabled = !enabled || actionInFlight;
       });
     }
 
@@ -393,9 +413,11 @@
           },
           body: JSON.stringify({ email, password })
         });
-        const data = await res.json();
-        if (!res.ok || !data.access_token) {
-          throw new Error(data.error_description || data.msg || 'Giriş başarısız.');
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch (_) {}
+        if (!res.ok || !data || !data.access_token) {
+          throw new Error((data && (data.error_description || data.message || data.msg || data.error)) || `Giriş başarısız (HTTP ${res.status}).`);
         }
         adminToken = data.access_token;
         refreshToken = data.refresh_token || '';
@@ -416,24 +438,107 @@
       cont.prepend(div);
     }
 
+    function updateSelectedUserDOM(u) {
+      const nameEl = document.getElementById('selectedUserName');
+      const stepsEl = document.getElementById('statSteps');
+      const pointsEl = document.getElementById('statPoints');
+      const streakEl = document.getElementById('statStreak');
+
+      if (nameEl) {
+        const demoTag = u.is_demo ? ' [DEMO]' : '';
+        nameEl.textContent = (u.nickname || 'İsimsiz') + (u.clan_name ? ` (${u.clan_name})` : '') + demoTag;
+      }
+      if (stepsEl) stepsEl.textContent = Number(u.today_steps || 0).toLocaleString('tr-TR');
+      if (pointsEl) pointsEl.textContent = Number(u.weekly_points || 0).toLocaleString('tr-TR');
+      if (streakEl) streakEl.textContent = (u.streak_days || 0) + ' Gün';
+    }
+
+    async function refreshSelectedUserCard(tokenToUse, currentSeq) {
+      const targetId = selectedUserId;
+      const selection = selectionSeq;
+      if (!targetId) return;
+
+      // Önce fresh cachedUsers içinde var mı bak
+      let updatedUser = cachedUsers ? cachedUsers.find(u => u.user_id === targetId) : null;
+
+      // Eğer ilk 50 içinde değilse, doğrudan v_leaderboard_users görünümünden tekil çek
+      if (!updatedUser) {
+        try {
+          const singleRes = await fetch(`${SUPABASE_URL}/rest/v1/v_leaderboard_users?user_id=eq.${encodeURIComponent(targetId)}&select=*`, {
+            cache: 'no-store',
+            headers: {
+              'apikey': ANON_KEY,
+              'Authorization': `Bearer ${tokenToUse}`,
+              'Cache-Control': 'no-cache, no-store, must-revalidate',
+              'Pragma': 'no-cache'
+            }
+          });
+          if (singleRes.ok) {
+            const rows = await singleRes.json();
+            if (rows && rows.length > 0) {
+              updatedUser = rows[0];
+            }
+          }
+        } catch (_) {}
+      }
+
+      if (updatedUser && currentSeq === usersRequestSeq && selection === selectionSeq && selectedUserId === targetId) {
+        selectedUserObj = updatedUser;
+        updateSelectedUserDOM(updatedUser);
+      }
+    }
+
     async function loadUsersList() {
+      const currentSeq = ++usersRequestSeq;
+      const loadStatusEl = document.getElementById('loadStatus');
+      if (loadStatusEl) loadStatusEl.textContent = '⏳ Yükleniyor...';
+
       const cont = document.getElementById('usersListContainer');
-      cont.innerHTML = '<p style="color: var(--text-muted); font-size: 12px;">Kullanıcılar yükleniyor...</p>';
+      if (!cachedUsers || cachedUsers.length === 0) {
+        cont.innerHTML = '<p style="color: var(--text-muted); font-size: 12px;">Kullanıcılar yükleniyor...</p>';
+      }
+
       try {
         const tokenToUse = adminToken || ANON_KEY;
         const res = await fetch(`${SUPABASE_URL}/rest/v1/v_leaderboard_users?select=*&limit=50&order=weekly_points.desc`, {
+          cache: 'no-store',
           headers: {
             'apikey': ANON_KEY,
-            'Authorization': `Bearer ${tokenToUse}`
+            'Authorization': `Bearer ${tokenToUse}`,
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache'
           }
         });
+
+        // Eski istek geç yanıt verirse yeni veriyi ezmesin
+        if (currentSeq !== usersRequestSeq) {
+          return;
+        }
+
         if (!res.ok) {
           throw new Error(`HTTP ${res.status}: ` + await res.text());
         }
-        cachedUsers = await res.json();
+
+        const users = await res.json();
+        if (currentSeq !== usersRequestSeq) return;
+        cachedUsers = users;
         renderUsersList();
+
+        // Seçili kullanıcı kartını güncel verilerle yenile (stale selectedUserObj kalmasın)
+        await refreshSelectedUserCard(tokenToUse, currentSeq);
+        if (currentSeq !== usersRequestSeq) return;
+
+        const timeStr = new Date().toLocaleTimeString('tr-TR');
+        const lastUpdatedEl = document.getElementById('lastUpdatedText');
+        if (lastUpdatedEl) lastUpdatedEl.textContent = `Son yenilenme: ${timeStr}`;
+        if (loadStatusEl) loadStatusEl.textContent = '✅ Güncel';
       } catch (e) {
-        cont.innerHTML = `<p style="color: var(--danger); font-size: 12px;">Hata: ${escapeHtml(e.message)}</p>`;
+        if (currentSeq === usersRequestSeq) {
+          if (loadStatusEl) loadStatusEl.textContent = '⚠️ Hata';
+          if (!cachedUsers || cachedUsers.length === 0) {
+            cont.innerHTML = `<p style="color: var(--danger); font-size: 12px;">Hata: ${escapeHtml(e.message)}</p>`;
+          }
+        }
       }
     }
 
@@ -468,13 +573,78 @@
     }
 
     function selectUser(u) {
+      if (actionInFlight) return;
+      selectionSeq++;
       selectedUserId = u.user_id;
       selectedUserObj = u;
-      document.getElementById('selectedUserName').textContent = (u.nickname || 'İsimsiz') + (u.clan_name ? ` (${u.clan_name})` : '');
-      document.getElementById('statSteps').textContent = (u.today_steps || 0).toLocaleString();
-      document.getElementById('statPoints').textContent = (u.weekly_points || 0).toLocaleString();
-      document.getElementById('statStreak').textContent = (u.streak_days || 0) + ' Gün';
+      updateSelectedUserDOM(u);
       renderUsersList();
+    }
+
+    function parseBoundedInteger(inputId, min, max, label) {
+      const el = document.getElementById(inputId);
+      if (!el) return null;
+      const raw = el.value.trim();
+      if (raw === '') {
+        showBanner(`${label} alanı boş bırakılamaz.`, false);
+        return null;
+      }
+      if (!/^-?\d+$/.test(raw)) {
+        showBanner(`${label} tam sayı (integer) olmalıdır.`, false);
+        return null;
+      }
+      const val = Number(raw);
+      if (!Number.isFinite(val) || !Number.isSafeInteger(val)) {
+        showBanner(`${label} geçerli bir tam sayı olmalıdır.`, false);
+        return null;
+      }
+      if (val < min || val > max) {
+        showBanner(`${label} değeri ${min.toLocaleString('tr-TR')} ile ${max.toLocaleString('tr-TR')} arasında olmalıdır.`, false);
+        return null;
+      }
+      return val;
+    }
+
+    function actionAddSteps() {
+      const count = parseBoundedInteger('inStepAdd', 1, 100000, 'Adım ekleme');
+      if (count === null) return;
+      executeAction('add_steps', { count });
+    }
+
+    function actionSetSteps() {
+      const total = parseBoundedInteger('inStepSet', 0, 1000000, 'Toplam adım');
+      if (total === null) return;
+      executeAction('set_steps', { total });
+    }
+
+    function actionAddGold() {
+      const amount = parseBoundedInteger('inGoldAdd', -100000, 100000, 'Altın miktarı');
+      if (amount === null) return;
+      executeAction('add_gold', { amount });
+    }
+
+    function actionSetGold() {
+      const total = parseBoundedInteger('inGoldSet', 0, 1000000, 'Toplam altın');
+      if (total === null) return;
+      executeAction('set_gold', { total });
+    }
+
+    function actionAddPoints() {
+      const points = parseBoundedInteger('inPointAdd', -10000, 10000, 'Puan miktarı');
+      if (points === null) return;
+      executeAction('add_points', { points });
+    }
+
+    function actionAddStreak() {
+      const days = parseBoundedInteger('inStreakAdd', 1, 365, 'Seri gün ekleme');
+      if (days === null) return;
+      executeAction('add_streak', { days });
+    }
+
+    function actionSetStreak() {
+      const days = parseBoundedInteger('inStreakSet', 0, 365, 'Toplam seri günü');
+      if (days === null) return;
+      executeAction('set_streak', { days });
     }
 
     async function executeAction(action, payload) {
@@ -486,6 +656,10 @@
         showBanner('Lütfen önce sol listeden bir kullanıcı seçin!', false);
         return;
       }
+      if (actionInFlight) return;
+      actionInFlight = true;
+      setGmButtonsEnabled(isServerAdmin);
+      const targetId = selectedUserId;
       const idempotencyKey = 'gm_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
       try {
         const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/rpc_universal_gm_action`, {
@@ -496,25 +670,40 @@
             'Authorization': `Bearer ${adminToken}`
           },
           body: JSON.stringify({
-            p_target_user_id: selectedUserId,
+            p_target_user_id: targetId,
             p_action: action,
             p_payload: payload,
             p_idempotency_key: idempotencyKey
           })
         });
-        const data = await res.json();
-        if (!res.ok || data.ok === false) {
-          const errMsg = data.message || (res.status === 403 || res.status === 400 ? 'Yetkisiz Erişim: Bu hesap veritabanı server_admins tablosunda yetkili değil.' : 'İşlem sunucu tarafından reddedildi.');
+
+        const text = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(text);
+        } catch (_) {}
+
+        if (!res.ok || !data || data.ok !== true) {
+          const errMsg = (data && (data.message || data.error_description || data.error || data.msg)) ||
+            (text && text.length < 200 ? text : null) ||
+            (res.status === 403 || res.status === 401 ? 'Yetkisiz Erişim: Bu hesap veritabanı server_admins tablosunda yetkili değil.' :
+             `İşlem sunucu tarafından reddedildi (HTTP ${res.status}).`);
           throw new Error(errMsg);
         }
-        showBanner(action === 'send_alert_notification'
+
+        const successMsg = action === 'send_alert_notification'
           ? 'Bildirim sunucuya kaydedildi; cihazda teslim henüz doğrulanmadı.'
-          : `İşlem Başarılı: ${action} uygulandı.`, true);
+          : (data.message || `İşlem Başarılı: ${action} uygulandı.`);
+        showBanner(successMsg, true);
         addAuditEntry(action, 'Başarılı', JSON.stringify(payload));
-        loadUsersList();
+
+        await loadUsersList();
       } catch (e) {
         showBanner('Hata: ' + e.message, false);
         addAuditEntry(action, 'Hata', e.message);
+      } finally {
+        actionInFlight = false;
+        setGmButtonsEnabled(isServerAdmin);
       }
     }
 
@@ -548,6 +737,80 @@
         body: 'Bu bir utanç panosu yönetici test bildirimidir.',
         severity: 'urgent'
       });
+    }
+
+    async function sendUserShameMessageTest() {
+      if (!adminToken) {
+        showBanner('İşlem Engellendi: Oturum açılmalıdır.', false);
+        return;
+      }
+      if (!selectedUserId) {
+        showBanner('Lütfen önce hedef kullanıcıyı seçin!', false);
+        return;
+      }
+      if (selectedUserObj && selectedUserObj.is_demo) {
+        showBanner('Hedef kullanıcı simülasyon (demo) profilidir. Canlı mesaj gönderilemez.', false);
+        return;
+      }
+
+      const msgInput = document.getElementById('inUserShameMsg');
+      const msg = msgInput ? msgInput.value.trim() : '';
+      if (!msg) {
+        showBanner('Utanç mesajı boş olamaz.', false);
+        return;
+      }
+      if (msg.length > 50) {
+        showBanner('Utanç mesajı en fazla 50 karakter olabilir (Mevcut: ' + msg.length + ').', false);
+        return;
+      }
+
+      if (actionInFlight) return;
+      actionInFlight = true;
+      setGmButtonsEnabled(isServerAdmin);
+      const targetId = selectedUserId;
+
+      const idempotencyKey = 'shame_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
+
+      try {
+        const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/rpc_send_shame_message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': ANON_KEY,
+            'Authorization': `Bearer ${adminToken}`
+          },
+          body: JSON.stringify({
+            p_target_id: targetId,
+            p_message: msg,
+            p_idempotency_key: idempotencyKey
+          })
+        });
+
+        const text = await res.text();
+        let data = null;
+        try {
+          data = JSON.parse(text);
+        } catch (_) {}
+
+        if (!res.ok || !data || data.ok !== true) {
+          const errMsg = (data && (data.message || data.error_description || data.error || data.msg)) ||
+            (text && text.length < 200 ? text : null) ||
+            `Sunucu hatası (HTTP ${res.status})`;
+          throw new Error(errMsg);
+        }
+
+        const okMsg = data.message || 'Oyuncu utanç mesajı başarıyla iletildi (10 altın düşüldü, günlük kota işlendi).';
+        showBanner(okMsg, true);
+        addAuditEntry('rpc_send_shame_message', 'Başarılı', `Hedef: ${targetId}, Mesaj: "${msg}"`);
+        if (msgInput) msgInput.value = '';
+        await loadUsersList();
+      } catch (e) {
+        showBanner('Hata: ' + e.message, false);
+        addAuditEntry('rpc_send_shame_message', 'Hata', e.message);
+      } finally {
+        actionInFlight = false;
+        setGmButtonsEnabled(isServerAdmin);
+      }
     }
 
     // İlk yüklemede oturumu ve yetkiyi doğrula
