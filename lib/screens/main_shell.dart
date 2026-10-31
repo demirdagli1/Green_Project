@@ -7,7 +7,6 @@ import '../services/hub.dart';
 import 'home/home_screen.dart';
 import 'leaderboard/leaderboard_screen.dart';
 import 'shop_profile/shop_profile_screen.dart';
-import 'transit_bike/qr_nfc_bike_modal.dart';
 
 class MainShell extends StatefulWidget {
   const MainShell({super.key});
@@ -17,8 +16,8 @@ class MainShell extends StatefulWidget {
 }
 
 class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
-  // Varsayılan: Ana Menü (index 1)
-  int _index = 1;
+  // Varsayılan: Ana Sayfa (index 0)
+  int _index = 0;
   String _lbCategory = 'individual';
   bool _lbShame = false;
   bool _lbHighlightSelf = false;
@@ -59,7 +58,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _lbShame = false;
       _lbHighlightSelf = highlightSelf;
       _lbNonce++;
-      _index = 2; // Sıralamalar sekmesi
+      _index = 1; // Sıralamalar sekmesi (index 1)
     });
   }
 
@@ -69,14 +68,13 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
       _lbShame = true;
       _lbHighlightSelf = false;
       _lbNonce++;
-      _index = 2; // Sıralamalar sekmesi
+      _index = 1; // Sıralamalar sekmesi (index 1)
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = <Widget>[
-      const QrNfcBikeModal(isTab: true),
       HomeScreen(
         onOpenLeaderboardClan: () => _openLeaderboard('clan', highlightSelf: true),
         onOpenLeaderboardIndividual: () => _openLeaderboard('individual', highlightSelf: true),
@@ -92,10 +90,10 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
     ];
 
     return PopScope(
-      canPop: _index == 1,
+      canPop: _index == 0,
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) {
-          setState(() => _index = 1);
+          setState(() => _index = 0);
         }
       },
       child: Scaffold(
@@ -103,7 +101,7 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
         bottomNavigationBar: BottomNavigationBar(
           currentIndex: _index,
           onTap: (i) {
-            if (i == 2) {
+            if (i == 1) {
               _lbHighlightSelf = false;
             }
             setState(() => _index = i);
@@ -116,13 +114,8 @@ class _MainShellState extends State<MainShell> with WidgetsBindingObserver {
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 11),
           items: const [
             BottomNavigationBarItem(
-              icon: Icon(Icons.qr_code_scanner),
-              label: 'QR / NFC',
-              tooltip: 'QR / NFC',
-            ),
-            BottomNavigationBarItem(
               icon: Icon(Icons.home_filled),
-              label: 'Ana Menü',
+              label: 'Ana Sayfa',
               tooltip: 'Ana sayfa',
             ),
             BottomNavigationBarItem(

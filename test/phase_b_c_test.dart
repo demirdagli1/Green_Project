@@ -144,7 +144,7 @@ void main() {
   });
 
   group('Aşama B & C UI & Gezinme Widget Testleri', () {
-    testWidgets('MainShell: 4 öğeli bottom navigation, varsayılan Ana Menü (index 1), Floating FAB yok', (tester) async {
+    testWidgets('MainShell: 3 öğeli bottom navigation, varsayılan Ana Sayfa (index 0), Floating FAB yok', (tester) async {
       SharedPreferences.setMockInitialValues({});
       final store = AppStore(backend: MemoryStore(), clock: () => DateTime.utc(2026, 10, 26, 9));
       await store.load();
@@ -158,21 +158,20 @@ void main() {
       // FloatingActionButton olmamalı
       expect(find.byType(FloatingActionButton), findsNothing);
 
-      // 4 öğeli BottomNavigationBar
+      // 3 öğeli BottomNavigationBar (QR/NFC yok: Ana Sayfa, Sıralamalar, Profil)
       final navBarFinder = find.byType(BottomNavigationBar);
       expect(navBarFinder, findsOneWidget);
       final navBar = tester.widget<BottomNavigationBar>(navBarFinder);
-      expect(navBar.items.length, 4);
-      expect(navBar.items[0].label, 'QR / NFC');
-      expect(navBar.items[1].label, 'Ana Menü');
-      expect(navBar.items[2].label, 'Sıralamalar');
-      expect(navBar.items[3].label, 'Profil');
+      expect(navBar.items.length, 3);
+      expect(navBar.items[0].label, 'Ana Sayfa');
+      expect(navBar.items[1].label, 'Sıralamalar');
+      expect(navBar.items[2].label, 'Profil');
 
-      // Varsayılan sayfa: Ana Menü (index 1) görünür
-      expect(navBar.currentIndex, 1);
+      // Varsayılan sayfa: Ana Sayfa (index 0) görünür
+      expect(navBar.currentIndex, 0);
       expect(find.text('Daha yeşil bir gelecek için adım at!'), findsOneWidget);
 
-      // Geri tuşu davranışı: Profil sekmesindeyken geri basılırsa Ana Menüye döner
+      // Geri tuşu davranışı: Profil sekmesindeyken geri basılırsa Ana Sayfaya döner
       await tester.tap(find.text('Profil'));
       await tester.pumpAndSettle();
       expect(find.text('Profil ve Mağaza'), findsOneWidget);

@@ -836,6 +836,12 @@ class AppStore extends ChangeNotifier {
     );
   }
 
+  /// Aktif bisiklet sürüşünü puansız ve cezasız iptal eder.
+  void cancelBike() {
+    bike = null;
+    notifyListeners();
+  }
+
   ActionResult evaluateBike({
     required String tripId,
     required double distanceKm,

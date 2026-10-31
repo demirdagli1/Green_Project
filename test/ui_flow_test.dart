@@ -137,23 +137,26 @@ void main() {
     expect(store.owned.contains('ava_ktu_mountaineer'), true);
   });
 
-  testWidgets('QR/NFC sayfası: kamera yok uyarısı, manuel kod, cooldown mesajı, klavye', (t) async {
+  testWidgets('MainShell 3 sekme navigasyonu: QR/NFC sekmesi yok, Ana Sayfa/Sıralamalar/Profil geçişi', (t) async {
     final store = await boot(t);
     await onboard(t, store);
-    await t.tap(find.text('QR / NFC'));
+    // QR / NFC sekmesi arayüzden tamamen kaldırıldı
+    expect(find.text('QR / NFC'), findsNothing);
+
+    // Sıralamalar sekmesine geçiş
+    await t.tap(find.text('Sıralamalar'));
     await t.pumpAndSettle();
-    expect(find.textContaining('Kamera ile QR tarama bu sürümde YOK'), findsOneWidget);
-    await t.enterText(find.byType(TextField), 'YESILADIM://TRANSIT/TRB-KTU-01');
-    await t.tap(find.text('Doğrula'));
+    expect(find.text('🏆 Gurur Tablosu'), findsOneWidget);
+
+    // Profil sekmesine geçiş
+    await t.tap(find.text('Profil'));
     await t.pumpAndSettle();
-    expect(store.me!.weeklyPoints, 3);
-    await t.tap(find.text('Doğrula'));
+    expect(find.text('Profil ve Mağaza'), findsOneWidget);
+
+    // Ana Sayfaya geri dönüş
+    await t.tap(find.text('Ana Sayfa'));
     await t.pumpAndSettle();
-    final msgFinder = find.textContaining('Aynı otobüsü iki kere mi');
-    await t.scrollUntilVisible(msgFinder, 100, scrollable: find.byType(Scrollable).last);
-    expect(msgFinder, findsOneWidget);
-    expect(store.me!.weeklyPoints, 3);
-    expect(find.text('Bu cihazda NFC donanımı yok.'), findsOneWidget);
+    expect(find.text('Daha yeşil bir gelecek için adım at!'), findsOneWidget);
   });
 
   testWidgets('küçük ekran + büyük yazı + uzun klan adı taşma üretmez', (t) async {

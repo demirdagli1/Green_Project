@@ -132,7 +132,7 @@ class HomeScreen extends StatelessWidget {
 
   Widget _autoMotionCard(AppStore store) {
     final auto = store.autoMotion;
-    final isCycling = auto.isAutoSessionActive;
+    final isCycling = auto.isAutoSessionActive || store.bike != null;
     final isPotential = auto.mode == AutoMotionMode.potentialBike;
 
     if (!isCycling && !isPotential && auto.mode != AutoMotionMode.walking) {
@@ -191,7 +191,7 @@ class HomeScreen extends StatelessWidget {
                         style: TextStyle(fontWeight: FontWeight.w900, fontSize: 13, color: AppColors.textDark),
                       ),
                       Text(
-                        auto.statusExplanation,
+                        auto.isAutoSessionActive ? auto.statusExplanation : 'Aktif Bisiklet Oturumu',
                         style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF047857)),
                       ),
                     ],
@@ -203,9 +203,9 @@ class HomeScreen extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _miniMetric('Mesafe', '${(auto.tripDistanceM / 1000).toStringAsFixed(2)} km'),
-                _miniMetric('Hız', '${auto.currentSpeedKmh.toStringAsFixed(1)} km/sa'),
-                _miniMetric('Maks Hız', '${auto.maxSpeedKmh.toStringAsFixed(1)} km/sa'),
+                _miniMetric('Mesafe', '${((auto.isAutoSessionActive ? auto.tripDistanceM : (store.bike?.distanceM ?? 0)) / 1000).toStringAsFixed(2)} km'),
+                _miniMetric('Hız', '${(auto.isAutoSessionActive ? auto.currentSpeedKmh : (store.bike?.currentKmh ?? 0)).toStringAsFixed(1)} km/sa'),
+                _miniMetric('Maks Hız', '${(auto.isAutoSessionActive ? auto.maxSpeedKmh : (store.bike?.maxKmh ?? 0)).toStringAsFixed(1)} km/sa'),
               ],
             ),
             const SizedBox(height: 10),
@@ -221,7 +221,7 @@ class HomeScreen extends StatelessWidget {
                     ),
                     icon: const Icon(Icons.check, size: 16),
                     label: const Text('Bitir & Kaydet', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-                    onPressed: () => auto.finishAutoTrip(),
+                    onPressed: () => auto.isAutoSessionActive ? auto.finishAutoTrip() : store.finishBike(),
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -232,7 +232,13 @@ class HomeScreen extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  onPressed: () => auto.cancelAutoTrip(),
+                  onPressed: () {
+                    if (auto.isAutoSessionActive) {
+                      auto.cancelAutoTrip();
+                    } else {
+                      store.cancelBike();
+                    }
+                  },
                   child: const Text('İptal', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
                 ),
               ],
