@@ -1,5 +1,13 @@
 # Canlı Supabase devam noktası
 
+## Son geçerli durum — Revizyon 03
+- Aşağıdaki eski 'public boş/şema yok' notları tarihsel kaldı. Kullanıcı ortak profil erişim modelini onayladı; green_project_initial_schema_safe migration başarıyla uygulandı.
+- Anonymous Auth çalışıyor. İlk istemci APK üç cihazda kullanıcı tarafından denendi. Eşitleme hataları raporlandı: GM yalnız yerel değiştiriyor, diğer kullanıcı Realtime olayları atlanıyor, outbox hata kuyruğu bloke ediyor. Mevcut 114 test gerçek cihazlar arası doğrulama sayılmaz.
+- supabase/verification.sql güvenli BEGIN/ROLLBACK sürümü MCP execute_sql ile hatasız çalıştı; kalıcı test değişikliği yok.
+- Güncel güvenlik danışmanı iki shame view için SECURITY DEFINER ERROR ve üç mutable search_path WARN gösterdi; ilk boş advisor sonucu güncel kabul edilmemeli. AGY artımlı düzeltme hazırlıyor.
+- REVIZYON_03.md ve REV03_INCELEME_NOTU.md güncel kapsam/inceleme kaynağı. AGY Flash High çalışıyor: agy-revizyon03.log; conversation 2d94a29a-a396-45dd-b403-13191b62df0e. AŞAMA_03_DURUM.md görev ilerlemesi. 06 migration ilk taslağı henüz uygulanmadı, inceleme engelleri çözülmeden uygulanmaz.
+- Yerel checkpoint commitleri be495d3 ve af1d72d. Push yok. Kullanıcı telefon testlerini yapar; otomatik kurulum/ekran gezinme yok. Kullanıcı 10 altın mesaj bedeli ve 3 puan kısa otobüs cezasını onayladı. Kısa ve az mesaj istiyor.
+
 ## En güncel durum — 31 Ekim
 - İlk `apply_migration` **otomatik güvenlik incelemesinde reddedildi**, uygulanmadı. Gerekçe: broad public policy/private gold_coins gibi alanların görünürlüğü ve boşhedef kanıtı. AynıSQLi execute_sql veya farklıyoldan çalıştırarak reddi BYPASS ETME.
 - Hedef `fhaxxraibydsjikxacbb` publictabloları redden sonra MCPile yeniden kontrol edildi: `tables:[]`. Authanon testoturumu var ama publicuygulamaşeması hâlâ kurulmadı.
