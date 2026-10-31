@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'app_store.dart';
 import 'auto_motion_engine.dart';
@@ -82,8 +83,8 @@ class CommandDispatcher {
         final raw = p['count'];
         if (raw is! num) return const CommandResult(ok: false, message: 'Geçersiz adım sayısı.');
         final n = raw.toInt();
-        if (n <= 0 || n > 500000) {
-          return const CommandResult(ok: false, message: 'Geçersiz veya sınır dışı adım sayısı (1 - 500.000 arası olmalı).');
+        if (n <= 0 || n > 100000) {
+          return const CommandResult(ok: false, message: 'Geçersiz veya sınır dışı adım sayısı (1 - 100.000 arası olmalı).');
         }
         final r = store.demoAddSteps(n);
         return CommandResult(ok: r.ok, message: r.message, data: {
@@ -95,8 +96,8 @@ class CommandDispatcher {
         final raw = p['total'];
         if (raw is! num) return const CommandResult(ok: false, message: 'Geçersiz adım sayısı.');
         final total = raw.toInt();
-        if (total < 0 || total > 500000) {
-          return const CommandResult(ok: false, message: 'Geçersiz veya sınır dışı adım sayısı (0 - 500.000 arası olmalı).');
+        if (total < 0 || total > 1000000) {
+          return const CommandResult(ok: false, message: 'Geçersiz veya sınır dışı adım sayısı (0 - 1.000.000 arası olmalı).');
         }
         if (store.me == null) return const CommandResult(ok: false, message: 'Profil yok.');
         final cur = store.me!.todaySteps;
@@ -104,8 +105,52 @@ class CommandDispatcher {
         if (diff > 0) {
           final r = store.demoAddSteps(diff);
           return CommandResult(ok: r.ok, message: 'Adım $total yapıldı (+${diff} eklendi).', data: {'todaySteps': store.me?.todaySteps});
+        } else if (diff == 0) {
+          // 600k onarım senaryosu: Adım zaten 600k ama puan verilmemişse (dayRewardedThousands < totalThousands)
+          final totalThousands = total ~/ 1000;
+          final expectedPts = totalThousands * 5;
+          final alreadyAwardedPts = store.dayRewardedThousands * 5;
+          final repairPts = expectedPts - alreadyAwardedPts;
+          if (repairPts > 0) {
+            store.dayRewardedThousands = totalThousands;
+            store.me = store.me!.copyWith(
+              weeklyPoints: store.me!.weeklyPoints + repairPts,
+              allTimePoints: store.me!.allTimePoints + repairPts,
+            );
+            if (store.myClan != null) {
+              final c = store.myClan!;
+              final idx = store.clans.indexWhere((clan) => clan.id == c.id);
+              if (idx >= 0) {
+                store.clans[idx] = c.copyWith(
+                  weeklyPoints: c.weeklyPoints + repairPts,
+                  allTimePoints: c.allTimePoints + repairPts,
+                );
+              }
+            }
+            store.commitDirect();
+            return CommandResult(ok: true, message: 'Adım $total korundu ve eksik +$repairPts puan onarıldı.', data: {'todaySteps': total, 'repairedPoints': repairPts});
+          }
+          return CommandResult(ok: true, message: 'Adım zaten $total.', data: {'todaySteps': total});
         } else {
-          store.me = store.me!.copyWith(todaySteps: total);
+          final oldThousands = cur ~/ 1000;
+          final newThousands = total ~/ 1000;
+          final deltaPts = (newThousands - oldThousands) * 5;
+          store.dayRewardedThousands = newThousands;
+          store.me = store.me!.copyWith(
+            todaySteps: total,
+            weeklyPoints: math.max(0, store.me!.weeklyPoints + deltaPts),
+            allTimePoints: math.max(0, store.me!.allTimePoints + deltaPts),
+          );
+          if (store.myClan != null && deltaPts != 0) {
+            final c = store.myClan!;
+            final idx = store.clans.indexWhere((clan) => clan.id == c.id);
+            if (idx >= 0) {
+              store.clans[idx] = c.copyWith(
+                weeklyPoints: math.max(0, c.weeklyPoints + deltaPts),
+                allTimePoints: math.max(0, c.allTimePoints + deltaPts),
+              );
+            }
+          }
           store.commitDirect();
           return CommandResult(ok: true, message: 'Adım $total olarak ayarlandı.', data: {'todaySteps': total});
         }

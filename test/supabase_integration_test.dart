@@ -17,6 +17,7 @@ class TestMockSupabaseGateway implements SupabaseGateway {
   final Map<String, dynamic> dbUsers = {};
   final Set<String> processedEvents = {};
   final List<Map<String, dynamic>> leaderboardRows = [];
+  final List<Map<String, dynamic>> shameBoardRows = [];
   final List<RealtimeChannel> activeChannels = [];
 
   TestMockSupabaseGateway({String userId = 'test-user-uuid-1'}) {
@@ -172,6 +173,9 @@ class TestMockSupabaseGateway implements SupabaseGateway {
     }
     if (name == 'v_leaderboard_users') {
       return leaderboardRows;
+    }
+    if (name == 'v_global_shame_board') {
+      return shameBoardRows;
     }
     return [];
   }
@@ -443,6 +447,35 @@ void main() {
       expect(r.ok, isTrue);
       expect(notifTitle, '🚨 TEST YÖNETİCİ UYARISI');
       expect(notifBody, 'Hemen bisiklete bin!');
+    });
+
+    test('10. fetchServerShameBoard bağımsız çalışır ve snapshotı store üzerine yansıtır', () async {
+      final gateway = TestMockSupabaseGateway(userId: 'shame-test-user-1');
+      final outbox = SupabaseOutbox(storage: mem);
+      final service = SupabaseService(gateway: gateway, outbox: outbox);
+
+      gateway.shameBoardRows.add({
+        'user_id': 'shame-uuid-99',
+        'masked_name': 'Can***',
+        'avatar_url': 'assets/avatars/ava_shame_1.png',
+        'clan_name': 'Marmara Bisiklet',
+        'weekly_car_taxi_trips': 12,
+        'weekly_wasted_co2_kg': 36.4,
+        'is_demo': false,
+        'global_shame_rank': 1,
+      });
+
+      final ok = await service.fetchServerShameBoard(store);
+      expect(ok, isTrue);
+      expect(store.isServerShameLoaded, isTrue);
+      expect(store.serverShameUsers.length, 1);
+      expect(store.serverShameUsers.first.username, 'Can***');
+      expect(store.serverShameUsers.first.weeklyWastedCo2Kg, 36.4);
+
+      // shameBoard() doğrudan bu snapshot'ı döner
+      final board = store.shameBoard();
+      expect(board.length, 1);
+      expect(board.first.serverUserId, 'shame-uuid-99');
     });
   });
 }

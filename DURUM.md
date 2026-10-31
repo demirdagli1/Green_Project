@@ -8,27 +8,30 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - Kullanıcının `Düzenlemeler.txt` değişiklikleri korunuyor, yönetici commitine katılmadı.
 - Root bağlı cihazda `adb install -r releases/YeSilAdim-debug.apk` çalıştırdı: Success. Uygulama verileri silinmedi; MainActivity açma komutu gönderildi. Elle test kullanıcıya ait.
 
-## Son tamamlanan teslim paketi (QR/NFC UI Kaldırma & 3 Sekmeli Shell)
-- **Kullanıcı düzeltmesi uygulandı:** Kullanıcıya açık QR/NFC okutma arayüzü tamamen kaldırıldı. Bottom navigation yalnız 3 öğe ve 3 sayfadan oluşur:
-  1. **Ana Sayfa** (Index 0, varsayılan başlangıç)
-  2. **Sıralamalar** (Index 1, kategori/utanç/vurgu geçişleri)
-  3. **Profil** (Index 2, mağaza ve envanter)
-- `MainShell` sayfa yığını, seçili indeks, geri tuşu (PopScope index 0'da çıkış, diğerlerinde Ana Sayfaya dönüş) ve sekme geçiş callbackleri 3 sekmeye uyarlandı.
-- Kullanılmayan `lib/screens/transit_bike/qr_nfc_bike_modal.dart` ekranı arayüzden temizlendi. Kamera/NFC native donanım köprüleri ve Supabase geçmiş migration kayıtları tarihsel bütünlük için körlemesine silinmedi; yalnızca kullanıcı arayüzünde okutma girişi bırakılmadı.
-- **Bisiklet işlevi korundu:** `HomeScreen` üzerindeki `AutoMotionEngine` otomatik bisiklet algılama kartı (hız, mesafe, maks hız metrikleri, 'Bitir & Kaydet' ve 'İptal' aksiyonları) eksiksiz çalışmaktadır. `AppStore.cancelBike()` metodu eklendi.
-
-## 500m Kısa Otobüs Cezası Durumu (İnceleme & Net Bildirim)
-- **Canlıya sahte/erken aktivasyon yapılmadı:**
-  - Kullanıcı arayüzünden QR/NFC okutma tamamen kaldırılmıştır; durak kodu tek başına mesafe kanıtı değildir.
-  - Gerçek 2 katmanlı otomatik otobüs sensör füzyon motoru `.worktrees/automatic-bus` dalında geliştirme aşamasındadır ve ana sunucuda `rpc_record_bus_trip` migration 07 ile güvenli **dormant** (etkisiz) durumdadır.
-  - İstemci tarafında `AutoTransportClassifierService` içinde 0 < mesafe <= 500m için -3 puan cezası (`DetectedActivityType.shortBusPenalty`) kuralı ve birim testleri hazırdır; ancak arkasında gerçek doğrulanmış otomatik yolculuk akışı olmadan canlı veritabanında sahte/keyfi ceza altyapısı **bilerek etkinleştirilmemiştir**.
+## Son tamamlanan teslim paketi (GM 600k Adım/Puan Senkronizasyonu & Ortak Utanç Panosu)
+- **Hata 1 (GM 600k Adım Puanı & Muhasebe) Tamamen Çözüldü:**
+  - GM panelinden `set_steps` ve `add_steps` çağrıldığında yalnızca `today_steps` artıp puanın sıfır kalma hatası düzeltildi.
+  - `public.activities` üzerindeki günlük `walk` etkinlikleri muhasebesi esas alındı: `(new_steps / 1000 * 5) - already_awarded_from_walk`.
+  - Canlıda daha önce 600k adım verilip 0 puan almış bozuk kullanıcılar, GM'in aynı değere `set_steps(600000)` çağırmasıyla eksiksiz **+3.000 puan** olarak onarılır.
+  - İdempotency ve tekrar çağrılarda `points_delta = 0` dönerek asla mükerrer/çifte puan üretmez.
+  - `add_steps` için 100.000 üst sınırı aşılırsa (`count > 100000`), miktar sessizce kırpılmadan net Türkçe hata mesajı döner. `set_steps` için 1.000.000 sınırı (600.000 dahil) geçerlidir.
+  - Adım artışıyla haftalık puan, all-time puan ve klan toplamı atomik güncellenir; 6.000 adım streak kuralı tetiklenir.
+- **Hata 2 (Cihazlar Arası Farklı Utanç Listesi & Mesaj Gönderilememe) Çözüldü:**
+  - Utanç tablosu artık puan top50'si yerine doğrudan `v_global_shame_board` görünümünden çekilen bağımsız ortak sunucu snapshot'ına (`serverShameUsers`) bağlandı.
+  - `SupabaseService.fetchServerShameBoard(store)` bağımsız helper haline getirildi; klan liderliği veya diğer sorguların başarısızlığından etkilenmez.
+  - `isServerShameLoaded = true` bayrağı ile sunucu snapshot'ı boş olsa dahi (0 israfçı) demo listesine geri düşüş (fallback) engellendi.
+  - Cihazın kendi kullanıcısı (`me`) sunucu sırasının üstüne keyfi eklenmez (`no me-override`); kullanıcı kendi sırasını sunucu snapshot'ından alır.
+  - Realtime `users` tablosu değişiklikleri 300ms debounce ile `fetchServerShameBoard`'u tetikler (yankı/reentrant fırtınası önlendi).
+  - Demo hedeflere mesaj gönderilemez, altın düşülmez; çevrimdışıyken sahte "iletildi" mesajı verilmez.
+- **Canlı Sunucu Doğrulaması:**
+  - Migration 11: `green_project_gm_steps_points_and_shame_fix` root tarafından preflight BEGIN/ROLLBACK testleri (%100 PASS) sonrası canlı veritabanına uygulandı.
 
 ## Kanıtlar, Testler ve APK
 - **Dart Analizi:** `dart analyze` ➔ **No issues found!** (0 hata, 0 uyarı).
-- **Otomatik Testler:** Çevrimdışı, `--no-pub --concurrency=1` ile **134/134 test BAŞARIYLA GEÇTİ** (`All tests passed!`). 3 sekmeli MainShell ve UI akış testleri güncellendi.
-- **Gradle Derlemesi:** `android/local.properties` Türkçe karakter yolu Java Properties standardına uygun olarak `Masa\u00fcst\u00fc` biçimine getirildi. `./gradlew assembleDebug --offline --no-daemon --max-workers=1` ile tek worker olarak **14 saniyede BUILD SUCCESSFUL** tamamlandı.
-- **APK Dosyası:** [releases/YeSilAdim-debug.apk](releases/YeSilAdim-debug.apk), **173.957.546 bayt**.
-- **SHA-256:** `700b2a66a1726d45f177af58eae1167d6dc67d1fceece8711a56708d95d1498a`.
+- **Otomatik Testler:** Çevrimdışı, `--no-pub --concurrency=1` ile **136/136 test BAŞARIYLA GEÇTİ** (`All tests passed!`). GM 600k onarım, sınır kontrolleri, utanç boş snapshot ve bağımsız shame fetch testleri eklendi.
+- **Gradle Derlemesi:** `android/local.properties` Türkçe karakter yolu `Masa\u00fcst\u00fc` Java unicode escape korunarak `./gradlew assembleDebug --offline --no-daemon --max-workers=1` ile **16 saniyede BUILD SUCCESSFUL** tamamlandı.
+- **APK Dosyası:** [releases/YeSilAdim-debug.apk](releases/YeSilAdim-debug.apk), **173.963.533 bayt**.
+- **SHA-256:** `c69f5be1f4c43883b3c792e9c46c734729d31647c57f8f9366d99d9597c12683`.
 - **Doğrulama:** `sha256sum -c releases/YeSilAdim-debug.apk.sha256` ➔ **OK**.
 
 ## Canlı sunucu: son kesin durum
@@ -60,3 +63,10 @@ Bu dosya güncel kayıttır. Eski raporlar `docs/arsiv/` içindedir; hepsini tek
 - Kullanıcı artık bağlı telefona APK yüklenmesini açıkça istedi; kurulum yönetimini root yapar.
 
 - `bdbffba`: QR/NFC ekranını kaldırma ve üç sekmeli gezinme; yeni APK bağlı cihaza başarıyla kuruldu.
+
+## Root son teslim teyidi
+- Migration 11 açık BEGIN/ROLLBACK preflight başarıyla çalıştı; gövdesi birebir karşılaştırılıp `green_project_gm_steps_points_and_shame_fix` olarak canlıya uygulandı. Güvenlik danışmanı 0 ERROR / 14 WARN.
+- Yeni APK SHA kontrolü releases dizininde geçti; bağlı ikinci telefona adb install -r: Success. MainActivity açıldı. Elle iki telefon senkron ve bildirim denemesi kullanıcıya ait.
+- Claude Opus/Sonnet ortak kotası bitti; son uygulama düzeltmesi, AGY raporuna göre136 test ve derleme Flash High ile tamamlandı.
+- Adım Ayarla600000 eski puansız kaydı onarır; tekrar aynı değerde çift ödül yok. Adım Ekle sınırı100000;600000 için Ayarla kullanılır.
+- Detaylı sunum docs/SUNUM_DETAYLI_REHBERI.md değil, **docs/SUNUM_DETAYLI_REHBER.md** yolunda; basit rehber korunuyor.

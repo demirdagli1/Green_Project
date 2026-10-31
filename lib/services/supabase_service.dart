@@ -354,7 +354,12 @@ class SupabaseService extends ChangeNotifier {
                 weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? store.me!.weeklyPoints,
                 goldCoins: (rec['gold_coins'] as num?)?.toInt() ?? store.me!.goldCoins,
                 todaySteps: (rec['today_steps'] as num?)?.toInt() ?? store.me!.todaySteps,
+                weeklyCarTaxiTrips: (rec['weekly_car_taxi_trips'] as num?)?.toInt() ?? store.me!.weeklyCarTaxiTrips,
+                weeklyWastedCo2Kg: (rec['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? store.me!.weeklyWastedCo2Kg,
               );
+              if (rec['today_steps'] != null) {
+                store.dayRewardedThousands = (rec['today_steps'] as num).toInt() ~/ 1000;
+              }
               store.commitDirect();
             } finally {
               _isEchoSuppressed = false;
@@ -368,6 +373,8 @@ class SupabaseService extends ChangeNotifier {
                 weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? old.weeklyPoints,
                 allTimePoints: (rec['all_time_points'] as num?)?.toInt() ?? old.allTimePoints,
                 todaySteps: (rec['today_steps'] as num?)?.toInt() ?? old.todaySteps,
+                weeklyCarTaxiTrips: (rec['weekly_car_taxi_trips'] as num?)?.toInt() ?? old.weeklyCarTaxiTrips,
+                weeklyWastedCo2Kg: (rec['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? old.weeklyWastedCo2Kg,
                 username: rec['nickname'] as String? ?? old.username,
                 equippedAvatar: rec['avatar_url'] as String? ?? old.equippedAvatar,
                 equippedPet: rec['pet_slug'] as String? ?? old.equippedPet,
@@ -387,6 +394,8 @@ class SupabaseService extends ChangeNotifier {
                 weeklyPoints: (rec['weekly_points'] as num?)?.toInt() ?? 0,
                 allTimePoints: (rec['all_time_points'] as num?)?.toInt() ?? 0,
                 streakDays: (rec['streak_days'] as num?)?.toInt() ?? 0,
+                weeklyCarTaxiTrips: (rec['weekly_car_taxi_trips'] as num?)?.toInt() ?? 0,
+                weeklyWastedCo2Kg: (rec['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? 0.0,
                 equippedAvatar: rec['avatar_url'] as String? ?? 'default_avatar',
                 equippedFrame: rec['frame_slug'] as String? ?? 'none',
                 equippedPet: rec['pet_slug'] as String? ?? 'none',
@@ -395,6 +404,9 @@ class SupabaseService extends ChangeNotifier {
             }
             store.commitDirect();
           }
+
+          // Realtime kullanıcı güncellemelerinde utanç listesini debounce ile güvenle yenile
+          _scheduleShameRefresh(store);
         },
       );
 
@@ -422,11 +434,62 @@ class SupabaseService extends ChangeNotifier {
     }
   }
 
+  Timer? _shameDebounceTimer;
+
+  void _scheduleShameRefresh(AppStore store) {
+    _shameDebounceTimer?.cancel();
+    _shameDebounceTimer = Timer(const Duration(milliseconds: 300), () {
+      fetchServerShameBoard(store);
+    });
+  }
+
+  /// Utanç Panosu Ortak Snapshot'ı (v_global_shame_board).
+  /// Puan top50'si dışındakiler dahil ortak evren; başarılı boş snapshot'ta da isServerShameLoaded = true set edilir.
+  Future<bool> fetchServerShameBoard(AppStore store) async {
+    final gw = _gateway;
+    if (gw == null) return false;
+    try {
+      final shameRows = await gw.queryTableOrView(
+        'v_global_shame_board',
+        limit: 50,
+        orderBy: 'global_shame_rank',
+        ascending: true,
+      );
+      final shameUsers = <AppUser>[];
+      for (final row in shameRows) {
+        final uid = row['user_id'] as String;
+        shameUsers.add(AppUser(
+          id: uid,
+          deviceId: 'SRV-$uid',
+          serverUserId: uid,
+          username: row['masked_name'] as String? ?? 'Ahm***',
+          clanId: '',
+          clanName: row['clan_name'] as String? ?? '',
+          isDemo: row['is_demo'] as bool? ?? false,
+          weeklyCarTaxiTrips: (row['weekly_car_taxi_trips'] as num?)?.toInt() ?? 0,
+          weeklyWastedCo2Kg: (row['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? 0.0,
+          equippedAvatar: row['avatar_url'] as String? ?? 'default_avatar',
+        ));
+      }
+      store.serverShameUsers = shameUsers;
+      store.isServerShameLoaded = true;
+      store.commitDirect();
+      return true;
+    } catch (e) {
+      debugPrint('[SupabaseService] v_global_shame_board çekme uyarısı: $e');
+      return false;
+    }
+  }
+
   /// Sunucudan Canlı Liderlik Verisini Çeker (Görünümler Üzerinden).
   Future<bool> fetchServerLeaderboard(AppStore store) async {
     final gw = _gateway;
     if (gw == null) return false;
 
+    // 1. Utanç panosu snapshot'ını klan veya diğer sorguların hatasından BAĞIMSIZ olarak yenile
+    await fetchServerShameBoard(store);
+
+    // 2. Kullanıcılar lider tablosu
     try {
       final userRows = await gw.queryTableOrView(
         'v_leaderboard_users',
@@ -455,17 +518,32 @@ class SupabaseService extends ChangeNotifier {
               allTimePoints: (row['all_time_points'] as num?)?.toInt() ?? 0,
               preventedCo2Kg: (row['weekly_saved_co2_kg'] as num?)?.toDouble() ?? 0.0,
               streakDays: (row['streak_days'] as num?)?.toInt() ?? 0,
+              weeklyCarTaxiTrips: (row['weekly_car_taxi_trips'] as num?)?.toInt() ?? 0,
+              weeklyWastedCo2Kg: (row['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? 0.0,
               equippedAvatar: row['avatar_url'] as String? ?? 'default_avatar',
               equippedFrame: row['frame_slug'] as String? ?? 'none',
               equippedPet: row['pet_slug'] as String? ?? 'none',
               clanRole: row['clan_role'] as String? ?? 'member',
             ));
+          } else if (store.me != null) {
+            store.me = store.me!.copyWith(
+              weeklyPoints: (row['weekly_points'] as num?)?.toInt() ?? store.me!.weeklyPoints,
+              allTimePoints: (row['all_time_points'] as num?)?.toInt() ?? store.me!.allTimePoints,
+              todaySteps: (row['today_steps'] as num?)?.toInt() ?? store.me!.todaySteps,
+              weeklyCarTaxiTrips: (row['weekly_car_taxi_trips'] as num?)?.toInt() ?? store.me!.weeklyCarTaxiTrips,
+              weeklyWastedCo2Kg: (row['weekly_wasted_co2_kg'] as num?)?.toDouble() ?? store.me!.weeklyWastedCo2Kg,
+            );
           }
         }
         store.serverUsers = serverUsers;
         store.commitDirect();
       }
+    } catch (e) {
+      debugPrint('[SupabaseService] v_leaderboard_users çekme hatası: $e');
+    }
 
+    // 3. Klanlar lider tablosu
+    try {
       final clanRows = await gw.queryTableOrView(
         'v_clan_leaderboard',
         limit: 20,
@@ -488,18 +566,14 @@ class SupabaseService extends ChangeNotifier {
         }
         store.commitDirect();
       }
-
-      _lastSyncTime = DateTime.now();
-      _status = SupabaseSyncStatus.connected;
-      notifyListeners();
-      return true;
     } catch (e) {
-      debugPrint('[SupabaseService] Liderlik çekme uyarısı: $e');
-      _status = SupabaseSyncStatus.offline;
-      _lastError = e.toString();
-      notifyListeners();
-      return false;
+      debugPrint('[SupabaseService] v_clan_leaderboard çekme hatası: $e');
     }
+
+    _lastSyncTime = DateTime.now();
+    _status = SupabaseSyncStatus.connected;
+    notifyListeners();
+    return true;
   }
 
   Future<void>? _outboxFuture;
@@ -788,7 +862,7 @@ class SupabaseService extends ChangeNotifier {
     final gw = _gateway;
     final idempotencyKey = 'shame_${DateTime.now().microsecondsSinceEpoch}';
     if (gw == null) {
-      return {'ok': true, 'message': 'Yerel oturumda utanç mesajı kaydedildi.'};
+      return {'ok': false, 'message': 'Çevrimdışısınız. Utanç mesajı göndermek için sunucu bağlantısı gereklidir.'};
     }
     try {
       final res = await gw.rpc('rpc_send_shame_message', params: {

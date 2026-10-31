@@ -3,7 +3,7 @@
 Bu rehber, kısa sunum notu ([SUNUM_CALISMA_REHBERI.md](SUNUM_CALISMA_REHBERI.md)) yetmediğinde çalışmak içindir. Algoritma ayrıntısı için [ALGORITMALAR_VE_MIMARI.md](ALGORITMALAR_VE_MIMARI.md) yardımcı kaynaktır; **çelişki olursa bu rehber ve kaynak kod esas alınır** (bkz. bölüm 16, o belgedeki eski QR anlatımı).
 
 > [!IMPORTANT]
-> **Doğrulanacak not (sunumdan önce):** "GM'den 600.000 adım verince puanın artmaması" ve "cihazlar arasında utanç (shame) listesinin farklı görünmesi" hatası ayrı bir çalışmada düzeltiliyor. Düzeltme dosyası ([11_gm_steps_points_and_shame_fix.sql](../supabase/migrations/11_gm_steps_points_and_shame_fix.sql)) ve ön deneme dosyası ([preflight_gm_steps_and_shame_fix.sql](../supabase/preflight_gm_steps_and_shame_fix.sql)) depoda var. Ancak bu rehberi yazarken **canlı sunucuya uygulandığı ve iki telefonda sonucun düzeldiği doğrulanmadı**. "Çözüldü" demeyin; son sürümde (DURUM.md + iki telefon) kontrol edin. Bu rehberin yazıldığı sırada dosya henüz commitlenmemişti (commit listesinde yok).
+> **Son durum:** GM adım→puan ve ortak utanç listesi düzeltmesi tamamlandı. Migration 11 canlı sunucuya uygulandı; açık BEGIN/ROLLBACK testinde 600.000 adım → 3.000 puan, aynı değerde ikinci ödülün engellenmesi, bozuk kayıt onarımı ve farklı oturumlarda aynı utanç listesi doğrulandı. Yeni APK bağlı telefona yüklendi. **İki fiziksel telefon ekranında canlı sonuç kullanıcı tarafından henüz doğrulanmadı.** Eski 600.000 adım kaydını panelde aynı değere yeniden ayarlamak eksik puanı onarır.
 
 ---
 
@@ -53,7 +53,7 @@ Bu rehber, kısa sunum notu ([SUNUM_CALISMA_REHBERI.md](SUNUM_CALISMA_REHBERI.md
 | Arka planda adım/konum takibi | **Garanti yok** (ön plan odaklı) |
 | Ortak sunucu | Supabase, anonim giriş çalışıyor |
 | Realtime (anında canlı akış) | İki oturumlu testte aynı veri okunuyor; 3 telefonda ekranın kendiliğinden güncellendiği **kanıtlanmadı** |
-| GM 600k adım→puan, shame cihaz farkı | **Düzeltme hazırlanıyor, doğrulanmadı** (başa bkz.) |
+| GM 600k adım→puan, shame cihaz farkı | **Sunucu düzeltmesi/testi tamamlandı; yeni APK kuruldu.** İki telefon ekranı kullanıcı tarafından kontrol edilecek. |
 
 Son güvenlik taraması kaydı: 0 hata, 14 uyarı (DURUM.md). "Tüm uyarılar giderildi" denmemeli.
 
@@ -123,7 +123,7 @@ Son güvenlik taraması kaydı: 0 hata, 14 uyarı (DURUM.md). "Tüm uyarılar gi
 - **6.000 adım serisi:** Günde 6.000'e ulaşınca seri +1 (günde en fazla bir kez). Dün 6.000 yoksa seri 1'den başlar.
 - **Sunucu da kendisi hesaplar:** `rpc_record_steps` ([03_functions_and_rpc.sql](../supabase/migrations/03_functions_and_rpc.sql)) puanı istemcinin söylediğine bakmadan kendi toplamından çıkarır.
 - **Telefon yeniden başlarsa** sayaç sıfırlanır. Yeni değer eskisinden küçükse uygulama hata/puan üretmez, yalnız yeni başlangıç noktası alır.
-- **Bilmediğimiz küçük nokta:** Sunucu gün sınırı `CURRENT_DATE` ile, uygulama Türkiye gününe göre tutuluyor. Gece yarısına yakın bir zaman dilimi farkı olabilir; ölçüp doğrulanmadı.
+- **Gün sınırı:** Migration 11 adım kaydı ve yönetici adım hesabını İstanbul takvim gününe hizalar. Gün dönümünde eski adımlara yeniden puan verilmemesi sunucu testinde doğrulandı.
 
 ### Adım nasıl "geçerli" sayılır?
 Adımlar 30 saniyelik pencerede toplanır, sonra `checkSteps` bakar:
@@ -179,7 +179,7 @@ Eşikler kodda, kesin kanıt değil. Önemli sayılar:
 **Utanç mesajı (dürtme):** 10 altın, günde 1 mesaj, en çok 50 karakter. Altın telefonda hemen düşmez; sunucu kabul ederse düşer ([06_revizyon_03.sql](../supabase/migrations/06_revizyon_03.sql), `rpc_send_shame_message`; tekrar gönderimi `idempotency_key` ile engellenir, kota kilit altında kontrol edilir).
 *Örnek:* Ayşe aynı gün 2. mesajı yazarsa kota dolduğu için reddedilir, altını eksilmez.
 
-> Utanç listesinin cihazlar arası farkı için başa konan nota bakın: düzeltme doğrulanmadı.
+> Ortak sunucu listesi düzeltildi ve farklı oturumlarda doğrulandı. İki fiziksel cihazın ekranındaki sonucu kullanıcı kontrol edecek.
 
 ---
 
@@ -242,7 +242,7 @@ Not: Bu kanıtlar tamamlanmadıkça "gerçek cihazda her şey doğrulandı" denm
 
 ## 12. Testler neyi kanıtlıyor, neyi kanıtlamıyor?
 
-[DURUM.md](../DURUM.md) kaydına göre son çalıştırma: analiz temiz, **134/134 test geçti**, APK derlendi. Not: bu rehber yazılırken test çalıştırılmadı; bu sayı kayıttan alınmıştır, son sürümle yeniden kontrol edilmelidir.
+[DURUM.md](../DURUM.md) kaydına göre son çalıştırma: analiz temiz, **136/136 test geçti**, APK derlendi. Not: bu rehber yazılırken test çalıştırılmadı; bu sayı kayıttan alınmıştır, son sürümle yeniden kontrol edilmelidir.
 
 | Test dosyası | Kanıtladığı |
 |---|---|
@@ -289,7 +289,7 @@ Uygulama 3 sekmelidir: **Ana Sayfa → Sıralamalar → Profil** ([main_shell.da
 - **Hile kuralı örneği:** 30 sn'de 100 adım → reddedilir.
 - **Hibrit klan formülü:** 5 üye/1.000 puan = 4.600, 10 üye/1.000 puan = 2.600 (bölüm 7).
 - **Telefon yeniden başlarsa:** sayaç sıfırlanır, ceza yok.
-- **Test neyi kanıtlar:** 134 test kural ve akışı korur; fiziksel doğruluğu değil.
+- **Test neyi kanıtlar:** 136 test kural ve akışı korur; fiziksel doğruluğu değil.
 - **Canlı demo:** komut yolla, ikinci telefonda sıralamayı yenile.
 
 ---
@@ -307,7 +307,7 @@ git show --stat bf89e78      # otobüs taslağı (ayrı dalda: wip/automatic-bus
 git branch -a
 ```
 
-Somut commit konuları (kayıttan): "feat: add automatic walking and cycling sessions", "fix: verify shared scores and require an admin session in GM panel", "fix: remove QR NFC screen and keep three navigation tabs", "docs: simplify presentation into everyday examples and short answers". Push yapılmaz; geçmiş yereldir. Henüz commitlenmemiş çalışma varsa (örneğin migration 11) `git status` ile göster.
+Somut commit konuları (kayıttan): "feat: add automatic walking and cycling sessions", "fix: verify shared scores and require an admin session in GM panel", "fix: remove QR NFC screen and keep three navigation tabs", "docs: simplify presentation into everyday examples and short answers". Push yapılmaz; geçmiş yereldir. Henüz commitlenmemiş çalışma varsa `git status` ile göster.
 
 ---
 
@@ -323,7 +323,7 @@ Somut commit konuları (kayıttan): "feat: add automatic walking and cycling ses
 8. **İnternet yoksa?** Olaylar telefonda bekler, sonra gider, tekrar gelen olay ikinci kez puan vermez.
 9. **Güvenlik tam mı?** Hayır. RLS ve admin tablosu var; güvenlik taraması 0 hata, 14 uyarı verdi. Hepsi giderildi diyemeyiz.
 10. **Anonim hesap kaybolursa?** Evet, e-posta olmadığı için uygulama silinince hesap geri gelmez.
-11. **GM'den 600.000 adım verince puan neden artmıyordu?** Hata bulundu; düzeltme hazırlanıyor, canlıda doğrulanması bekliyor (başa bkz.). "Çözüldü" demiyoruz.
+11. **GM'den 600.000 adım verince puan neden artmıyordu?** Eski yönetici komutu yalnız adım sayısını değiştiriyordu. Sunucu düzeltildi; aynı değeri tekrar ayarlamak eksik puanı onarır, sonraki tekrar ikinci ödül vermez.
 12. **Shame listesi neden iki telefonda farklıydı?** Aynı hata paketinde düzeltiliyor; doğrulanmadı.
 13. **CO₂ değerleri gerçek mi?** Hayır, model. Araç km başına 0,192 kg, yürüyüş/bisiklet 0,19 kg/km tasarruf katsayısı eğitim amaçlı sabittir; resmî ölçüm iddiası yok.
 14. **Test geçmesi uygulamanın doğru olduğu demek mi?** Hayır; yalnız yazılan kuralların korunduğunu gösterir.

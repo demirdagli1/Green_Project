@@ -91,6 +91,8 @@ class AppStore extends ChangeNotifier {
   List<AppUser> demoUsers = List.of(DemoData.users());
   List<Clan> clans = List.of(DemoData.clans());
   List<AppUser> serverUsers = [];
+  List<AppUser> serverShameUsers = [];
+  bool isServerShameLoaded = false;
   final Set<String> owned = {'default_avatar'};
   final Map<String, int> transitLast = {};
   final List<String> processed = [];
@@ -1195,20 +1197,28 @@ class AppStore extends ChangeNotifier {
   }
 
   List<AppUser> shameBoard() {
-    final Map<String, AppUser> deduped = {};
-    for (final su in serverUsers) {
-      if (su.weeklyCarTaxiTrips > 0) {
-        deduped[su.serverUserId ?? su.id] = su;
-      }
+    // 1. Ortak sunucu snapshot'ı (v_global_shame_board) başarıyla yüklendiyse:
+    //    Cihazlar arası tutarlı ortak listeyi esas al. Boş bile olsa demo ile karıştırma.
+    //    Me override yok; kullanıcının kendi sırası sunucu snapshot'ından gelir.
+    if (isServerShameLoaded) {
+      return List<AppUser>.unmodifiable(serverShameUsers);
     }
+
+    // 2. Çevrimiçi/oturum açık ancak sunucu utanç listesi henüz yüklenmediyse veya başarısız olduysa:
+    //    Demo verilerini gerçek sunucu kullanıcısıymış gibi gösterme, boş liste dön.
+    if (serverUsers.isNotEmpty || (me != null && me!.serverUserId != null)) {
+      return const [];
+    }
+
+    // 3. Saf çevrimdışı / demo durumu fallback (yalnız yerel demo profilinde)
+    final Map<String, AppUser> deduped = {};
     for (final du in demoUsers) {
-      if (du.weeklyCarTaxiTrips > 0 && !deduped.containsKey(du.id)) {
+      if (du.weeklyCarTaxiTrips > 0 && du.weeklyWastedCo2Kg > 0) {
         deduped[du.id] = du;
       }
     }
-    if (me != null && me!.weeklyCarTaxiTrips > 0) {
-      final myKey = me!.serverUserId ?? me!.id;
-      deduped[myKey] = me!;
+    if (me != null && me!.weeklyCarTaxiTrips > 0 && me!.weeklyWastedCo2Kg > 0) {
+      deduped[me!.id] = me!;
     }
     final l = deduped.values.toList();
     l.sort((a, b) {

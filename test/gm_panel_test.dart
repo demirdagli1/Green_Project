@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:green_project/models/app_user.dart';
 import 'package:green_project/services/app_store.dart';
 import 'package:green_project/services/command_dispatcher.dart';
 import 'package:green_project/services/gm_server.dart';
@@ -21,15 +22,35 @@ void main() {
       dispatcher = CommandDispatcher(store);
     });
 
-    test('add_steps ve set_steps parametreli çalışır', () {
+    test('add_steps ve set_steps parametreli çalışır ve 600k adım ile puan muhasebesi senkronize edilir', () {
       expect(store.me!.todaySteps, 0);
-      final r1 = dispatcher.dispatch('add_steps', {'count': 334});
-      expect(r1.ok, true);
-      expect(store.me!.todaySteps, 334);
+      expect(store.me!.weeklyPoints, 0);
+      final initialClanPts = store.myClan?.weeklyPoints ?? 0;
 
-      final r2 = dispatcher.dispatch('set_steps', {'total': 6666});
+      // add_steps 5000 adım -> 25 puan
+      final r1 = dispatcher.dispatch('add_steps', {'count': 5000});
+      expect(r1.ok, true);
+      expect(store.me!.todaySteps, 5000);
+      expect(store.me!.weeklyPoints, 25);
+
+      // 600k set_steps: 600.000 adıma ayarlanır, toplam 3000 puan (fark +2975 puan eklenir)
+      final r2 = dispatcher.dispatch('set_steps', {'total': 600000});
       expect(r2.ok, true);
-      expect(store.me!.todaySteps, 6666);
+      expect(store.me!.todaySteps, 600000);
+      expect(store.me!.weeklyPoints, 3000);
+      expect(store.myClan?.weeklyPoints, initialClanPts + 3000);
+
+      // Bozuk 600k durumu simülasyonu: Kullanıcının adımı 600k ama puanı 0
+      store.me = store.me!.copyWith(weeklyPoints: 0);
+      store.dayRewardedThousands = 0;
+      final r3 = dispatcher.dispatch('set_steps', {'total': 600000});
+      expect(r3.ok, true);
+      expect(store.me!.weeklyPoints, 3000); // Eksik +3000 puan başarıyla onarıldı
+
+      // Tekrar set_steps(600000) çağrısında çift puan verilmez
+      final r4 = dispatcher.dispatch('set_steps', {'total': 600000});
+      expect(r4.ok, true);
+      expect(store.me!.weeklyPoints, 3000);
     });
 
     test('sayısal sınır kontrolü: negatif veya aşırı değerler reddedilir ve state değişmez', () {
@@ -37,11 +58,14 @@ void main() {
       final initialGold = store.me!.goldCoins;
       final initialStreak = store.me!.streakDays;
 
-      // Adım sınırları
+      // Adım sınırları (add_steps maks 100.000, set_steps maks 1.000.000)
+      final rAddExceed = dispatcher.dispatch('add_steps', {'count': 100001});
+      expect(rAddExceed.ok, false);
+      expect(rAddExceed.message.contains('1 - 100.000 arası olmalı'), true);
+
       expect(dispatcher.dispatch('add_steps', {'count': -10}).ok, false);
-      expect(dispatcher.dispatch('add_steps', {'count': 99999999}).ok, false);
       expect(dispatcher.dispatch('set_steps', {'total': -1}).ok, false);
-      expect(dispatcher.dispatch('set_steps', {'total': 600000}).ok, false);
+      expect(dispatcher.dispatch('set_steps', {'total': 1000001}).ok, false);
       expect(store.me!.todaySteps, initialSteps);
 
       // Streak sınırları
@@ -243,6 +267,43 @@ void main() {
       disabledServer.enabled = false;
       await disabledServer.start(initialToken: 'sec', listenPort: 8105);
       expect(disabledServer.isRunning, false);
+    });
+
+    test('utanç panosu: sunucu snapshotı boşsa demo fallback yapılmaz, online liste esastır', () {
+      // 1. Çevrimdışı durumda demo fallback çalışır
+      store.isServerShameLoaded = false;
+      final offlineList = store.shameBoard();
+      expect(offlineList.isNotEmpty, true);
+      expect(offlineList.any((u) => u.username.contains('Pelinsu')), true);
+
+      // 2. Sunucu snapshotı başarıyla yüklendi ancak boş (0 israfçı var):
+      store.isServerShameLoaded = true;
+      store.serverShameUsers = [];
+      final emptySnapshotList = store.shameBoard();
+      // Demo fallback olmamalı, liste boş dönmeli
+      expect(emptySnapshotList.isEmpty, true);
+
+      // 3. Puan top50 dışındaki (0 puanlı) ancak yüksek araç israfı olan kullanıcı snapshotta korunur
+      store.serverShameUsers = [
+        const AppUser(
+          id: 'user-shame-001',
+          deviceId: 'SRV-user-shame-001',
+          username: 'Giz***',
+          clanId: '',
+          clanName: 'Karadeniz Fırtınası',
+          weeklyPoints: 0, // Puanı 0, top50 puan listesinde ASLA yer alamaz!
+          weeklyCarTaxiTrips: 15,
+          weeklyWastedCo2Kg: 45.5,
+        ),
+      ];
+      final onlineShameList = store.shameBoard();
+      expect(onlineShameList.length, 1);
+      expect(onlineShameList.first.username, 'Giz***');
+      expect(onlineShameList.first.weeklyWastedCo2Kg, 45.5);
+
+      // 4. Cezası olmayan cihaz kullanıcısı (me) listeye zorla enjekte edilmez
+      expect(store.me?.weeklyCarTaxiTrips ?? 0, 0);
+      expect(onlineShameList.any((u) => u.id == store.me!.id), false);
     });
   });
 }

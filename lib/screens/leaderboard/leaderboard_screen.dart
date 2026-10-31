@@ -443,9 +443,10 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   Widget _shameList(store) {
     final list = store.shameBoard();
     final myId = store.me?.id;
+    final mySrvId = store.me?.serverUserId;
     final windowItems = LeaderboardWindow.build<AppUser>(
       items: list,
-      isSelf: (u) => myId != null && u.id == myId,
+      isSelf: (u) => (myId != null && u.id == myId) || (mySrvId != null && (u.serverUserId == mySrvId || u.id == mySrvId)),
     );
 
     return ListView(
