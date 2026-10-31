@@ -1,4 +1,6 @@
 # 🌿 Yeşil Adım (EcoClan) — Sunum ve Jüri Çalışma Rehberi
+
+**Yeni ara commitleri okuma:** `f5d950b` bu sunum rehberini ve Git anlatımını ekler. `cda28f9` Revizyon 03 arayüzünü, pet/klan görsellerini, otobüs sınıflandırıcı taslağını ve eşitleme düzeltmelerini kaydeden **WIP** checkpoint'tir. WIP, çalışmanın kaybolmaması için alınan ara kayıttır; canlı sunucu doğrulaması ve teslim onayı anlamına gelmez. Hocaya `git show --stat cda28f9` ile bu aşamadaki dosya değişikliklerini gösterebilirsin.
 > **Öğretici, Şeffaf ve Kod Gerçekliğine Dayalı Rehber**  
 > **Son Güncelleme:** 31 Ekim 2026 | **Proje Durumu:** Revizyon 03 (Geliştirme Devam Ediyor / `ROOT_DAGITIM_BEKLIYOR`)  
 > **Önemli Not:** Bu belge, jüri ve hoca sunumunda projeyi ezbere girmeden, mimariyi ve kodun gerçek sınırlarını bilerek savunabilmeniz için hazırlanmıştır. Gerçekte olmayan hiçbir özellik varmış gibi anlatılmamış; sistemin çalışan yönleri kadar sınırlamaları da şeffafça açıklanmıştır.
