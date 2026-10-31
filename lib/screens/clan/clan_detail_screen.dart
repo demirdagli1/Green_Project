@@ -66,16 +66,11 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> {
     return members;
   }
 
-  String _getMemberRole(int index, AppUser member) {
-    if (member.clanRole == 'leader' || member.clanRole == 'Lider') return 'Lider';
-    if (member.clanRole == 'elder' || member.clanRole == 'Kıdemli') return 'Kıdemli';
-    if (member.clanRole == 'member' || member.clanRole == 'Üye') {
-      // Sunucu henüz özel rol atamamışsa lig sıralaması mantığı fallback olarak kullanılır
-      if (index == 0) return 'Lider';
-      if (index <= 2) return 'Kıdemli';
-      return 'Üye';
-    }
-    return member.clanRole;
+  String _getMemberRole(AppUser member) {
+    final role = member.clanRole.trim().toLowerCase();
+    if (role == 'leader' || role == 'lider') return 'Lider';
+    if (role == 'elder' || role == 'kıdemli') return 'Kıdemli';
+    return 'Üye';
   }
 
   Color _getRoleColor(String role) {
@@ -169,7 +164,7 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> {
                     _buildMemberRow(
                       rank: i + 1,
                       member: members[i],
-                      role: _getMemberRole(i, members[i]),
+                      role: _getMemberRole(members[i]),
                       isMe: (members[i].serverUserId ?? members[i].id) == myId,
                     ),
                     const SizedBox(height: 8),

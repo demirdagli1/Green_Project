@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:green_project/services/app_store.dart';
+import 'package:green_project/services/command_dispatcher.dart';
 import 'package:green_project/services/storage.dart';
 import 'package:green_project/services/supabase_outbox.dart';
 import 'package:green_project/services/supabase_service.dart';
@@ -396,6 +397,52 @@ void main() {
       // Sıralamada demo etiketleri korunur
       final ranked = store.rankedUsers();
       expect(ranked.any((u) => u.isDemo), isTrue);
+    });
+
+    test('8. update_bio ağ/bağlantı hatasında outbox öğesini SESSİZCE SİLMEZ, kuyrukta saklar', () async {
+      final gateway = TestMockSupabaseGateway(userId: 'user-bio-test');
+      gateway.shouldFailNetwork = true; // RPC çağrıları SocketException fırlatacak
+      final outbox = SupabaseOutbox(storage: mem);
+      final service = SupabaseService(gateway: gateway, outbox: outbox);
+
+      store.register(deviceId: 'DEV-BIO', name: 'Bio Testi', clanName: 'KTÜ Kanuni');
+      store.me = store.me!.copyWith(serverUserId: 'user-bio-test');
+
+      // 1. Bio güncelleme outbox'a eklenir
+      await outbox.enqueue(actionType: 'update_bio', payload: {'bio': 'Yeni Yeşil Hedefler'});
+      expect(outbox.pendingCount, 1);
+
+      // 2. Ağ hatası varken outbox işlenir
+      await service.processOutbox(store);
+
+      // 3. Olay SİLİNMEMELİ; ağ hatası nedeniyle kuyrukta (status: failed) kalmalıdır!
+      expect(outbox.pendingCount, 1, reason: 'Ağ hatasında kullanıcı değişikliği sessizce silinmemelidir');
+      expect(outbox.items.first.actionType, 'update_bio');
+      expect(outbox.items.first.status, OutboxItemStatus.failed);
+      expect(outbox.items.first.retryCount, 1);
+    });
+
+    test('9. send_alert_notification komutu sistem bildirimini (ses/titreşim) tetikler', () {
+      String? notifTitle;
+      String? notifBody;
+      final localStore = AppStore(
+        backend: mem,
+        systemNotify: (t, b) async {
+          notifTitle = t;
+          notifBody = b;
+          return true;
+        },
+      );
+      final dispatcher = CommandDispatcher(localStore);
+
+      final r = dispatcher.dispatch('send_alert_notification', {
+        'title': '🚨 TEST YÖNETİCİ UYARISI',
+        'body': 'Hemen bisiklete bin!',
+      });
+
+      expect(r.ok, isTrue);
+      expect(notifTitle, '🚨 TEST YÖNETİCİ UYARISI');
+      expect(notifBody, 'Hemen bisiklete bin!');
     });
   });
 }

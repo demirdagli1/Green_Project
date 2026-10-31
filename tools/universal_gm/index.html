@@ -177,6 +177,15 @@
               🔄 Hedef Kullanıcının Bugünkü Utanç Mesaj Kotasını Güvenle Sıfırla
             </button>
           </div>
+
+          <!-- RAHATSIZ EDİCİ BİLDİRİM / DÜRTME -->
+          <label>🚨 Rahatsız Edici Bildirim / Test Uyarısı (Ses & Titreşim)</label>
+          <div class="action-row">
+            <input type="text" id="inAlertMsg" placeholder="Özel bildirim mesajı (Opsiyonel, boş bırakılırsa varsayılan uyarı)" style="flex: 2;">
+            <button class="btn-danger gm-action-btn" style="flex: 1;" onclick="sendAlertNotification()">
+              🚨 Rahatsız Edici Bildirim Gönder
+            </button>
+          </div>
         </div>
 
         <!-- DENETİM İZİ (AUDIT LOG) -->
@@ -490,6 +499,16 @@
         showBanner('Hata: ' + e.message, false);
         addAuditEntry(action, 'Hata', e.message);
       }
+    }
+
+    function sendAlertNotification() {
+      const msgInput = document.getElementById('inAlertMsg').value.trim();
+      const body = msgInput || 'Dikkat: Yeşil Adım sistem yöneticisinden acil test uyarısı!';
+      executeAction('send_alert_notification', {
+        title: '🚨 Yeşil Adım Yönetici Uyarısı!',
+        body: body,
+        severity: 'urgent'
+      });
     }
 
     // İlk yüklemede oturumu ve yetkiyi doğrula

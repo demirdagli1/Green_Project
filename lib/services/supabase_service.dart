@@ -303,6 +303,11 @@ class SupabaseService extends ChangeNotifier {
         table: 'admin_notifications_log',
         callback: (payload) {
           final rec = payload.newRecord;
+          final targetUid = rec['target_user_id'] as String?;
+          final myUid = store.me?.serverUserId;
+          if (targetUid != null && myUid != null && targetUid != myUid) {
+            return;
+          }
           final title = rec['title'] as String? ?? 'Sunucu Bildirimi';
           final body = rec['message_body'] as String? ?? '';
           store.demoNotify(title, body);
@@ -569,11 +574,13 @@ class SupabaseService extends ChangeNotifier {
               break;
 
             case 'update_bio':
-              // Güvenli sütun güncellemesi
-              if (store.me?.serverUserId != null) {
-                await gw.rpc('rpc_get_my_profile'); // oturum doğrulaması
-              }
-              itemDone = true;
+              final nick = store.me?.username ?? 'Kullanıcı';
+              final bio = (item.payload['bio'] as String?) ?? '';
+              final res = await gw.rpc('rpc_update_profile', params: {
+                'p_nickname': nick,
+                'p_bio': bio,
+              });
+              itemDone = (res is Map && (res['ok'] == true || res['duplicate'] == true));
               break;
 
             default:

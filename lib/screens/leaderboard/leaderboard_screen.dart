@@ -11,6 +11,7 @@ import '../../models/league_tier.dart';
 import '../../widgets/clan_league_badge.dart';
 import '../../widgets/individual_league_badge.dart';
 import '../../services/hub.dart';
+import '../clan/clan_detail_screen.dart';
 
 class LeaderboardScreen extends StatefulWidget {
   final String initialCategory; // 'individual' | 'clan'
@@ -554,7 +555,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
         child: const Text('🚕', style: TextStyle(fontSize: 14)),
       ),
       title: '${c.name}${isMyClan ? ' (Klanın)' : ''}',
-      sub: '${c.memberCount} üye ${c.memberCount < 5 ? '(Yetersiz üye)' : ''} • Dokun: Dürt',
+      sub: '${c.memberCount} üye ${c.memberCount < 5 ? '(Yetersiz üye)' : ''} • Dokun: Dürt / Detay',
       badge: ClanLeagueBadge(tier: tier, size: 20),
       trail: '${c.weeklyWastedCo2Kg.toStringAsFixed(1)} kg CO₂',
       onTap: () => _openClanShamePokeDialog(context, c, store),
@@ -679,7 +680,7 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
                         );
                         return;
                       }
-                      if (text.runes.length > 50) {
+                      if (text.characters.length > 50) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('Mesaj en fazla 50 karakter olabilir.')),
                         );
@@ -732,33 +733,101 @@ class _LeaderboardScreenState extends State<LeaderboardScreen> {
   }
 
   void _openClanShamePokeDialog(BuildContext context, Clan clan, store) {
-    // Klan üyelerinden gerçek kullanıcı ara
     final clanId = clan.id;
     final realMembers = store.serverUsers
         .where((u) => u.clanId == clanId && !u.isDemo && (u.serverUserId ?? u.id) != (store.me?.serverUserId ?? store.me?.id))
         .toList();
 
-    if (realMembers.isEmpty) {
-      showDialog(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: Text(clan.name),
-          content: const Text(
-            'Bu klanda şu an çevrimiçi canlı bir üye bulunmuyor. Mesajlar yalnızca gerçek kullanıcılara iletilebilir.',
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${clan.name} (Utanç Sırası)',
+                style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 16),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Toplam ${clan.weeklyWastedCo2Kg.toStringAsFixed(1)} kg CO₂ israfı • ${clan.memberCount} üye',
+                style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppColors.fireRed.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.send_rounded, color: AppColors.fireRed),
+                ),
+                title: const Text('Klan Üyesine Utanç Mesajı Gönder (10 🪙)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                subtitle: Text(realMembers.isEmpty
+                    ? 'Bu klanda henüz çevrimiçi canlı üye yok.'
+                    : 'Klandaki üyeye dalga geçen mesaj gönderir.'),
+                enabled: realMembers.isNotEmpty,
+                onTap: realMembers.isEmpty
+                    ? null
+                    : () {
+                        Navigator.pop(ctx);
+                        if (realMembers.length == 1) {
+                          _openShamePokeDialog(context, realMembers.first, store);
+                        } else {
+                          _chooseClanMemberToPoke(context, clan, realMembers, store);
+                        }
+                      },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: AppColors.primaryPurple.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Icons.shield_outlined, color: AppColors.primaryPurple),
+                ),
+                title: const Text('Klan Detayları ve Hiyerarşi', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
+                subtitle: const Text('Üye listesi, sıralama ve klan lig durumunu incele.', style: TextStyle(fontSize: 11)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => ClanDetailScreen(clan: clan)));
+                },
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Tamam'),
-            ),
-          ],
         ),
-      );
-      return;
-    }
+      ),
+    );
+  }
 
-    // Gerçek üyelerden birini hedefle
-    final target = realMembers.first;
-    _openShamePokeDialog(context, target, store);
+  void _chooseClanMemberToPoke(BuildContext context, Clan clan, List<AppUser> realMembers, store) {
+    showDialog(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: Text('${clan.name} — Hedef Üye Seç'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: realMembers.length,
+            itemBuilder: (context, i) {
+              final m = realMembers[i];
+              return ListTile(
+                title: Text(m.username, style: const TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text('${m.weeklyPoints} P • ${m.todaySteps} adım'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 12),
+                onTap: () {
+                  Navigator.pop(dlgCtx);
+                  _openShamePokeDialog(context, m, store);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dlgCtx), child: const Text('İptal')),
+        ],
+      ),
+    );
   }
 }

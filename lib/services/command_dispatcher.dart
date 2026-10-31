@@ -269,6 +269,12 @@ class CommandDispatcher {
         store.resetShameQuota();
         return const CommandResult(ok: true, message: 'Utanç tablosu günlük mesaj kotası sıfırlandı.');
 
+      case 'send_alert_notification':
+        final title = (p['title'] as String?)?.trim() ?? '🚨 Yönetici Uyarısı!';
+        final body = (p['body'] as String?)?.trim() ?? 'Dikkat: Yeşil Adım sistem yöneticisi tarafından bildirim gönderildi.';
+        store.demoNotify(title, body);
+        return const CommandResult(ok: true, message: 'Test bildirimi (ses & titreşim) cihaza iletildi.');
+
       case 'set_bio':
         final bio = (p['bio'] as String?) ?? '';
         if (bio.runes.length > 160) {

@@ -410,6 +410,16 @@ class CosmeticAssetSlot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (item.category == ShopCategory.pet) {
+      final petAsset = DemoData.getPetAssetPath(item.id);
+      if (petAsset != null) {
+        return SizedBox(
+          width: size,
+          height: size,
+          child: Image.asset(petAsset, fit: BoxFit.contain),
+        );
+      }
+    }
     return Container(
       width: size,
       height: size,

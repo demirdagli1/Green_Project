@@ -147,7 +147,10 @@ class SupabaseOutbox extends ChangeNotifier {
     final lower = error.toLowerCase();
     return lower.contains('violates check constraint') ||
         lower.contains('invalid input syntax') ||
-        lower.contains('syntax error');
+        lower.contains('syntax error') ||
+        lower.contains('violates foreign key constraint') ||
+        lower.contains('violates not-null constraint') ||
+        lower.contains('kullanıcı bulunamadı');
   }
 
   Future<void> markFailed(String id, String error, {bool forceQuarantine = false}) async {

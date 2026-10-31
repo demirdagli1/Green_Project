@@ -62,7 +62,7 @@ class HomeScreen extends StatelessWidget {
                             const Text('Daha yeşil bir gelecek için adım at!',
                                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Color(0xFF1E1B4B))),
                             const SizedBox(height: 4),
-                            Text('${user.username} • ${user.clanName}',
+                            Text('${user.username} • ${user.clanName.isEmpty ? 'Klansız' : user.clanName}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
@@ -385,13 +385,15 @@ class HomeScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          clan != null ? clan.name : 'Klan Yok',
+                          clan != null ? clan.name : 'Klansız',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
                         ),
                         Text(
-                          '${tier.clanName} • ${clan?.memberCount ?? 0} üye (Detay)',
+                          clan != null
+                              ? '${tier.clanName} • ${clan.memberCount} üye (Detay)'
+                              : 'Klan sıralamasını gör',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 10, color: AppColors.primaryPurple, fontWeight: FontWeight.w700),
